@@ -1,0 +1,422 @@
+package com.jelly.farmhelper.fabric.config;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.jelly.farmhelper.fabric.FarmHelperFabric;
+import com.jelly.farmhelper.fabric.config.struct.RewarpPoint;
+import com.jelly.farmhelper.fabric.feature.FeatureCatalog;
+import com.jelly.farmhelper.fabric.macro.LegacyMacroType;
+import com.jelly.farmhelper.fabric.macro.LegacyMacroProfiles;
+import com.jelly.farmhelper.fabric.macro.MacroPattern;
+import net.fabricmc.loader.api.FabricLoader;
+
+import java.io.IOException;
+import java.io.Reader;
+import java.io.Writer;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+public class ConfigManager {
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private final Path configPath = FabricLoader.getInstance().getConfigDir().resolve("farmhelper-fabric.json");
+
+    private FarmHelperConfig config = new FarmHelperConfig();
+
+    public void load() {
+        if (!Files.exists(configPath)) {
+            save();
+            return;
+        }
+
+        try (Reader reader = Files.newBufferedReader(configPath)) {
+            FarmHelperConfig loaded = GSON.fromJson(reader, FarmHelperConfig.class);
+            if (loaded != null) {
+                config = sanitize(loaded);
+            }
+        } catch (IOException e) {
+            FarmHelperFabric.LOGGER.error("Failed to load config from {}", configPath, e);
+        }
+    }
+
+    public void save() {
+        try {
+            Files.createDirectories(configPath.getParent());
+            try (Writer writer = Files.newBufferedWriter(configPath)) {
+                GSON.toJson(config, writer);
+            }
+        } catch (IOException e) {
+            FarmHelperFabric.LOGGER.error("Failed to save config to {}", configPath, e);
+        }
+    }
+
+    public FarmHelperConfig getConfig() {
+        return config;
+    }
+
+    private FarmHelperConfig sanitize(FarmHelperConfig loaded) {
+        if (loaded.macroType == null) {
+            loaded.macroType = LegacyMacroType.S_V_NORMAL_TYPE;
+        }
+        if (loaded.macroPattern == null) {
+            loaded.macroPattern = loaded.useLegacyProfileDefaults
+                    ? LegacyMacroProfiles.forType(loaded.macroType).pattern()
+                    : loaded.macroType.defaultPattern();
+        }
+        if (loaded.forwardTicksBeforeTurn <= 0) {
+            loaded.forwardTicksBeforeTurn = 140;
+        }
+        if (loaded.sideStepTicks <= 0) {
+            loaded.sideStepTicks = 16;
+        }
+        if (loaded.rewarpActivationRadius <= 0) {
+            loaded.rewarpActivationRadius = 2;
+        }
+        if (loaded.rewarpDelayMs <= 0) {
+            loaded.rewarpDelayMs = 400;
+        }
+        if (loaded.rewarpDelayRandomnessMs < 0) {
+            loaded.rewarpDelayRandomnessMs = 350;
+        }
+        if (loaded.rewarpPoints == null) {
+            loaded.rewarpPoints = new java.util.ArrayList<>();
+        } else {
+            java.util.ArrayList<RewarpPoint> sanitizedRewarpPoints = new java.util.ArrayList<>();
+            for (RewarpPoint point : loaded.rewarpPoints) {
+                if (point == null) {
+                    continue;
+                }
+                point.normalizeInPlace(sanitizedRewarpPoints.size() + 1);
+                sanitizedRewarpPoints.add(point);
+            }
+            loaded.rewarpPoints = sanitizedRewarpPoints;
+        }
+        if (loaded.stationaryFailsafeTicks <= 0) {
+            loaded.stationaryFailsafeTicks = 200;
+        }
+        if (loaded.schedulerWaitForRewarpTimeoutSeconds <= 0) {
+            loaded.schedulerWaitForRewarpTimeoutSeconds = 120;
+        }
+        if (loaded.timeBetweenChangingRowsMs < 0) {
+            loaded.timeBetweenChangingRowsMs = 400;
+        }
+        if (loaded.randomTimeBetweenChangingRowsMs < 0) {
+            loaded.randomTimeBetweenChangingRowsMs = 200;
+        }
+        if (loaded.rotationTimeMs < 100) {
+            loaded.rotationTimeMs = 500;
+        }
+        if (loaded.rotationTimeRandomnessMs < 0) {
+            loaded.rotationTimeRandomnessMs = 300;
+        }
+        if (loaded.statusUpdateIntervalMinutes <= 0) {
+            loaded.statusUpdateIntervalMinutes = 5;
+        }
+        if (loaded.antiStuckStationaryTicks <= 0) {
+            loaded.antiStuckStationaryTicks = 95;
+        }
+        if (loaded.antiStuckTriesUntilWarp <= 0) {
+            loaded.antiStuckTriesUntilWarp = 3;
+        }
+        if (loaded.triggerFailsafeKey <= 0) {
+            loaded.triggerFailsafeKey = 297;
+        }
+        if (loaded.startMacroKey <= 0) {
+            loaded.startMacroKey = 296;
+        }
+        if (loaded.stopMacroKey <= 0) {
+            loaded.stopMacroKey = 298;
+        }
+        if (loaded.openMenuKey == 0) {
+            loaded.openMenuKey = 70;
+        }
+        if (loaded.freelookKey == 0) {
+            loaded.freelookKey = 76;
+        }
+        if (loaded.cancelFailsafeKey == 0) {
+            loaded.cancelFailsafeKey = -1;
+        }
+        if (loaded.toggleUngrabMouseKey == 0) {
+            loaded.toggleUngrabMouseKey = -1;
+        }
+        if (loaded.plotCleaningHelperKey == 0) {
+            loaded.plotCleaningHelperKey = 80;
+        }
+        if (loaded.triggerPestsDestroyerKey == 0) {
+            loaded.triggerPestsDestroyerKey = -1;
+        }
+        if (loaded.tpToInfestedPlotKey == 0) {
+            loaded.tpToInfestedPlotKey = -1;
+        }
+        if (loaded.farmingSpeed <= 0) {
+            loaded.farmingSpeed = 400;
+        }
+        if (loaded.inventoryFullRatio <= 0 || loaded.inventoryFullRatio > 100) {
+            loaded.inventoryFullRatio = 65;
+        }
+        if (loaded.inventoryFullTimeSeconds <= 0) {
+            loaded.inventoryFullTimeSeconds = 6;
+        }
+        if (loaded.autoSellCommandCooldownSeconds <= 0) {
+            loaded.autoSellCommandCooldownSeconds = 8;
+        }
+        if (loaded.startKillingPestsAt <= 0) {
+            loaded.startKillingPestsAt = 3;
+        }
+        loaded.startKillingPestsAt = Math.max(1, Math.min(8, loaded.startKillingPestsAt));
+        if (loaded.autoPestExchangeMinPests <= 0) {
+            loaded.autoPestExchangeMinPests = 10;
+        }
+        if (loaded.autoGodPotCheckMinutes <= 0) {
+            loaded.autoGodPotCheckMinutes = 30;
+        }
+        if (loaded.autoRepellentCheckMinutes <= 0) {
+            loaded.autoRepellentCheckMinutes = 20;
+        }
+        if (loaded.autoCookieCheckMinutes <= 0) {
+            loaded.autoCookieCheckMinutes = 30;
+        }
+        if (loaded.autoSprayonatorCheckMinutes <= 0) {
+            loaded.autoSprayonatorCheckMinutes = 20;
+        }
+        if (loaded.autoSprayonatorActionSeconds <= 0) {
+            loaded.autoSprayonatorActionSeconds = 24;
+        }
+        if (loaded.autoSprayonatorAutoBuyAmount <= 0) {
+            loaded.autoSprayonatorAutoBuyAmount = 256;
+        }
+        if (loaded.autoSprayonatorMaterial == null || loaded.autoSprayonatorMaterial.isBlank()) {
+            loaded.autoSprayonatorMaterial = "Compost";
+        }
+        if (loaded.autoBazaarActionSeconds <= 0) {
+            loaded.autoBazaarActionSeconds = 20;
+        }
+        if (loaded.autoWardrobeActionSeconds <= 0) {
+            loaded.autoWardrobeActionSeconds = 18;
+        }
+        if (loaded.autoWardrobePreferredSlot <= 0) {
+            loaded.autoWardrobePreferredSlot = 1;
+        }
+        if (loaded.autoReconnectDelaySeconds <= 0) {
+            loaded.autoReconnectDelaySeconds = 5;
+        }
+        if (loaded.autoReconnectMaxAttempts <= 0) {
+            loaded.autoReconnectMaxAttempts = 3;
+        }
+        if (loaded.customFailsafeReactionMinMs <= 0) {
+            loaded.customFailsafeReactionMinMs = 800;
+        }
+        if (loaded.customFailsafeReactionMaxMs < loaded.customFailsafeReactionMinMs) {
+            loaded.customFailsafeReactionMaxMs = loaded.customFailsafeReactionMinMs + 600;
+        }
+        if (loaded.failsafeAnvilAlertIntervalTicks <= 0) {
+            loaded.failsafeAnvilAlertIntervalTicks = 12;
+        }
+        if (loaded.failsafeAnvilAlertVolume <= 0f) {
+            loaded.failsafeAnvilAlertVolume = 1.0f;
+        }
+        if (loaded.desktopNotificationCooldownSeconds < 0) {
+            loaded.desktopNotificationCooldownSeconds = 20;
+        }
+        if (loaded.petSwapperActionSeconds <= 0) {
+            loaded.petSwapperActionSeconds = 8;
+        }
+        if (loaded.plotCleaningScanRadius <= 0) {
+            loaded.plotCleaningScanRadius = 4;
+        }
+        if (loaded.plotCleaningActionSeconds <= 0) {
+            loaded.plotCleaningActionSeconds = 15;
+        }
+        if (loaded.visitorsMacroMinVisitors <= 0) {
+            loaded.visitorsMacroMinVisitors = 5;
+        }
+        if (loaded.visitorsMacroActionSeconds <= 0) {
+            loaded.visitorsMacroActionSeconds = 12;
+        }
+        if (loaded.visitorsMacroMaxVisitorsPerCycle <= 0) {
+            loaded.visitorsMacroMaxVisitorsPerCycle = 3;
+        }
+        if (loaded.visitorsMacroRetryLimit <= 0) {
+            loaded.visitorsMacroRetryLimit = 3;
+        }
+        if (loaded.visitorsMacroBlacklistCsv == null) {
+            loaded.visitorsMacroBlacklistCsv = "";
+        }
+        if (loaded.visitorsMacroWhitelistCsv == null) {
+            loaded.visitorsMacroWhitelistCsv = "";
+        }
+        if (loaded.nameFilter == null) {
+            loaded.nameFilter = "Librarian|Maeve|Spaceman";
+        }
+        loaded.visitorsActionUncommon = Math.max(0, Math.min(3, loaded.visitorsActionUncommon));
+        loaded.visitorsActionRare = Math.max(0, Math.min(3, loaded.visitorsActionRare));
+        loaded.visitorsActionLegendary = Math.max(0, Math.min(3, loaded.visitorsActionLegendary));
+        loaded.visitorsActionMythic = Math.max(0, Math.min(3, loaded.visitorsActionMythic));
+        loaded.visitorsActionSpecial = Math.max(0, Math.min(3, loaded.visitorsActionSpecial));
+        if (loaded.pestsDestroyerActionSeconds <= 0) {
+            loaded.pestsDestroyerActionSeconds = 15;
+        }
+        if (loaded.pestsDestroyerMaxPasses <= 0) {
+            loaded.pestsDestroyerMaxPasses = 3;
+        }
+        if (loaded.pestsDestroyerRetryLimit <= 0) {
+            loaded.pestsDestroyerRetryLimit = 3;
+        }
+        loaded.pestsDestroyerCantReachTicks = Math.max(0, loaded.pestsDestroyerCantReachTicks);
+        if (loaded.pestsDestroyerCantReachTicks > 0) {
+            loaded.pestsDestroyerCantReachTicks = Math.max(20, Math.min(400, loaded.pestsDestroyerCantReachTicks));
+        }
+        if (loaded.schemaVersion < 10) {
+            loaded.pestsDestroyerDisableDuringJacobsContest = true;
+        }
+        if (loaded.pestsDestroyerOnTrackPersistTicks <= 0) {
+            loaded.pestsDestroyerOnTrackPersistTicks = 30;
+        }
+        if (loaded.pestsDestroyerOnTrackStuckMs <= 0) {
+            loaded.pestsDestroyerOnTrackStuckMs = 7000;
+        }
+        if (loaded.pestsDestroyerOnTrackRadius <= 0f) {
+            loaded.pestsDestroyerOnTrackRadius = 8f;
+        }
+        if (loaded.pestsDestroyerOnTrackFov <= 0) {
+            loaded.pestsDestroyerOnTrackFov = 95;
+        }
+        if (loaded.pestsAimDeadzoneYaw <= 0f) {
+            loaded.pestsAimDeadzoneYaw = 4.5f;
+        }
+        if (loaded.pestsAimDeadzonePitch <= 0f) {
+            loaded.pestsAimDeadzonePitch = 3.0f;
+        }
+        if (loaded.pestFarmerWaitSeconds <= 0) {
+            loaded.pestFarmerWaitSeconds = 8;
+        }
+        if (loaded.pestFarmerBiohazardSlot <= 0) {
+            loaded.pestFarmerBiohazardSlot = 1;
+        }
+        if (loaded.pestFarmerFermentoSlot <= 0) {
+            loaded.pestFarmerFermentoSlot = 2;
+        }
+        if (loaded.autoPestExchangeActionSeconds <= 0) {
+            loaded.autoPestExchangeActionSeconds = 10;
+        }
+        if (loaded.autoPestExchangeRetryLimit <= 0) {
+            loaded.autoPestExchangeRetryLimit = 3;
+        }
+        if (loaded.desyncPauseDelayMs <= 0) {
+            loaded.desyncPauseDelayMs = 4_500;
+        }
+        if (loaded.desyncStationaryTicks <= 0) {
+            loaded.desyncStationaryTicks = 110;
+        }
+        if (loaded.performanceModeMaxFps < 10) {
+            loaded.performanceModeMaxFps = 30;
+        }
+        if (loaded.performanceModeViewDistance < 2) {
+            loaded.performanceModeViewDistance = 2;
+        }
+        if (loaded.statusHudX < 0) {
+            loaded.statusHudX = 8;
+        }
+        if (loaded.statusHudY < 0) {
+            loaded.statusHudY = 8;
+        }
+        if (loaded.profitHudX < 0) {
+            loaded.profitHudX = 8;
+        }
+        if (loaded.profitHudY < 0) {
+            loaded.profitHudY = 170;
+        }
+        if (loaded.debugHudX < 0) {
+            loaded.debugHudX = 8;
+        }
+        if (loaded.debugHudY < 0) {
+            loaded.debugHudY = 250;
+        }
+        if (loaded.rancherSpeedCheckMinutes <= 0) {
+            loaded.rancherSpeedCheckMinutes = 10;
+        }
+        if (loaded.proxyType == null || loaded.proxyType.isBlank()) {
+            loaded.proxyType = "SOCKS";
+        }
+        loaded.showStatsSession = loaded.showStatsSession || (!loaded.showStats24H && !loaded.showStats7D && !loaded.showStats30D);
+        if (loaded.composterY <= 0) {
+            loaded.composterX = -11;
+            loaded.composterY = 72;
+            loaded.composterZ = -27;
+        }
+        if (loaded.pestExchangeDeskY <= 0) {
+            loaded.pestExchangeDeskX = -24;
+            loaded.pestExchangeDeskY = 71;
+            loaded.pestExchangeDeskZ = -7;
+        }
+        if (loaded.schemaVersion < 11) {
+            loaded.enableFailsafeBanner = true;
+            loaded.failsafeBannerShowReason = true;
+            loaded.enableFailsafeAnvilAlert = true;
+            loaded.failsafeAnvilAlertIntervalTicks = 12;
+            loaded.failsafeAnvilAlertVolume = 1.0f;
+            loaded.desktopNotificationCooldownSeconds = 20;
+        }
+        if (loaded.schemaVersion < 12) {
+            // Pre-26.3 configs stored GLFW keycodes; SDL keyboard state is much smaller.
+            loaded.toggleMacroKey = migrateKey(loaded.toggleMacroKey, 53);
+            loaded.startMacroKey = migrateKey(loaded.startMacroKey, 64);
+            loaded.stopMacroKey = migrateKey(loaded.stopMacroKey, 66);
+            loaded.openMenuKey = migrateKey(loaded.openMenuKey, 9);
+            loaded.triggerFailsafeKey = migrateKey(loaded.triggerFailsafeKey, 65);
+            loaded.freelookKey = migrateKey(loaded.freelookKey, 15);
+            loaded.cancelFailsafeKey = migrateKey(loaded.cancelFailsafeKey, 0);
+            loaded.toggleUngrabMouseKey = migrateKey(loaded.toggleUngrabMouseKey, 0);
+            loaded.plotCleaningHelperKey = migrateKey(loaded.plotCleaningHelperKey, 19);
+            loaded.triggerPestsDestroyerKey = migrateKey(loaded.triggerPestsDestroyerKey, 0);
+            loaded.tpToInfestedPlotKey = migrateKey(loaded.tpToInfestedPlotKey, 0);
+        } else {
+            loaded.toggleMacroKey = sanitizeKey(loaded.toggleMacroKey, 53);
+            loaded.startMacroKey = sanitizeKey(loaded.startMacroKey, 64);
+            loaded.stopMacroKey = sanitizeKey(loaded.stopMacroKey, 66);
+            loaded.openMenuKey = sanitizeKey(loaded.openMenuKey, 9);
+            loaded.triggerFailsafeKey = sanitizeKey(loaded.triggerFailsafeKey, 65);
+            loaded.freelookKey = sanitizeKey(loaded.freelookKey, 15);
+            loaded.cancelFailsafeKey = sanitizeKey(loaded.cancelFailsafeKey, 0);
+            loaded.toggleUngrabMouseKey = sanitizeKey(loaded.toggleUngrabMouseKey, 0);
+            loaded.plotCleaningHelperKey = sanitizeKey(loaded.plotCleaningHelperKey, 19);
+            loaded.triggerPestsDestroyerKey = sanitizeKey(loaded.triggerPestsDestroyerKey, 0);
+            loaded.tpToInfestedPlotKey = sanitizeKey(loaded.tpToInfestedPlotKey, 0);
+        }
+        if (loaded.featureToggles == null) {
+            loaded.featureToggles = FarmHelperConfig.defaultFeatureToggles();
+        } else {
+            for (FeatureCatalog.FeatureDefinition definition : FeatureCatalog.DEFINITIONS) {
+                loaded.featureToggles.putIfAbsent(definition.id(), false);
+            }
+        }
+        loaded.schemaVersion = Math.max(12, loaded.schemaVersion);
+        return loaded;
+    }
+
+    // SDL_NUM_SCANCODES is 512; out-of-range values crash InputConstants.isKeyDown on focus.
+    private static final int SDL_SCANCODE_LIMIT = 512;
+
+    private static int migrateKey(int stored, int sdlDefault) {
+        if (stored < 0) {
+            return 0;
+        }
+        return switch (stored) {
+            case 96 -> 53; // GLFW KEY_GRAVE
+            case 296 -> 64; // GLFW KEY_F7
+            case 297 -> 65; // GLFW KEY_F8
+            case 298 -> 66; // GLFW KEY_F9
+            case 70 -> 9; // GLFW KEY_F
+            case 76 -> 15; // GLFW KEY_L
+            case 80 -> 19; // GLFW KEY_P
+            case 708 -> 65; // legacy failsafe default
+            default -> sanitizeKey(stored, sdlDefault);
+        };
+    }
+
+    private static int sanitizeKey(int stored, int sdlDefault) {
+        if (stored < 0 || stored >= SDL_SCANCODE_LIMIT) {
+            return sdlDefault;
+        }
+        return stored;
+    }
+}
