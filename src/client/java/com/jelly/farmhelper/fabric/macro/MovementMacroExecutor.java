@@ -360,7 +360,13 @@ public class MovementMacroExecutor {
         laneReferenceYaw = closestCardinal(baseYaw);
         laneReferenceYawResolved = true;
         laneShiftDirection = resolveInitialLaneShiftDirection(player.getYRot(), laneReferenceYaw);
-        moveRight = resolveFacingPreferredSide(player.getYRot(), laneReferenceYaw, moveRight);
+        // Camera-locked wheat/potato/carrot always prefer starting RIGHT (D). Facing-based
+        // preference flips LEFT when body yaw still faces along the row before camera lock.
+        if (activeType != null && activeType.locksCameraLikeWheat()) {
+            moveRight = true;
+        } else {
+            moveRight = resolveFacingPreferredSide(player.getYRot(), laneReferenceYaw, moveRight);
+        }
         targetYaw = baseYaw;
         if (activeTuning.motionMode() == CropMacroMotionMode.MUSHROOM_ROTATE && !config.customYaw) {
             targetYaw = laneReferenceYaw + 30f + (float) (ThreadLocalRandom.current().nextDouble(-2.0, 2.0));
@@ -1071,6 +1077,20 @@ public class MovementMacroExecutor {
             return LegacyRouteState.RIGHT;
         }
         if (isSideCropReady(client, -1, routingYaw)) {
+            return LegacyRouteState.LEFT;
+        }
+
+        Walkability openSides = computeWalkability(client, routingYaw);
+        boolean cameraLocked = activeType != null && activeType.locksCameraLikeWheat();
+        VerticalLaneStuckLogic.StartSide preferred = VerticalLaneStuckLogic.preferStartSide(
+                cameraLocked,
+                openSides.right(),
+                openSides.left()
+        );
+        if (preferred == VerticalLaneStuckLogic.StartSide.RIGHT) {
+            return LegacyRouteState.RIGHT;
+        }
+        if (preferred == VerticalLaneStuckLogic.StartSide.LEFT) {
             return LegacyRouteState.LEFT;
         }
 

@@ -91,4 +91,31 @@ public final class VerticalLaneStuckLogic {
     public static boolean shouldRelockCardinalYaw(boolean cameraLockedPreset, boolean resolvedSide) {
         return cameraLockedPreset && resolvedSide;
     }
+
+    public enum StartSide {
+        RIGHT,
+        LEFT,
+        DEFER
+    }
+
+    /**
+     * Wheat/potato/carrot should start RIGHT when that side is open. Wall-proximity scanning
+     * otherwise picks LEFT when the left edge is nearer (common at garden spawn).
+     */
+    public static StartSide preferStartSide(
+            boolean cameraLockedCrop,
+            boolean rightWalkable,
+            boolean leftWalkable
+    ) {
+        if (!cameraLockedCrop) {
+            return StartSide.DEFER;
+        }
+        if (rightWalkable) {
+            return StartSide.RIGHT;
+        }
+        if (leftWalkable) {
+            return StartSide.LEFT;
+        }
+        return StartSide.DEFER;
+    }
 }

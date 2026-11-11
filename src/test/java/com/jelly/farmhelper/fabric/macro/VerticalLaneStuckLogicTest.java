@@ -104,4 +104,24 @@ class VerticalLaneStuckLogicTest {
         assertFalse(VerticalLaneStuckLogic.shouldRelockCardinalYaw(false, true));
         assertFalse(VerticalLaneStuckLogic.shouldRelockCardinalYaw(true, false));
     }
+
+    @Test
+    void wheatPrefersRightWhenBothSidesOpen() {
+        assertEquals(
+                VerticalLaneStuckLogic.StartSide.RIGHT,
+                VerticalLaneStuckLogic.preferStartSide(true, true, true)
+        );
+        assertEquals(
+                VerticalLaneStuckLogic.StartSide.RIGHT,
+                VerticalLaneStuckLogic.preferStartSide(true, true, false)
+        );
+        assertEquals(
+                VerticalLaneStuckLogic.StartSide.LEFT,
+                VerticalLaneStuckLogic.preferStartSide(true, false, true)
+        );
+        assertEquals(
+                VerticalLaneStuckLogic.StartSide.DEFER,
+                VerticalLaneStuckLogic.preferStartSide(false, true, true)
+        );
+    }
 }
