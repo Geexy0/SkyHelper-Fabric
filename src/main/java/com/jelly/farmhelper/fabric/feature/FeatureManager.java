@@ -4,6 +4,7 @@ import com.jelly.farmhelper.fabric.FarmHelperFabric;
 import com.jelly.farmhelper.fabric.config.FarmHelperConfig;
 import com.jelly.farmhelper.fabric.feature.module.AutoComposterFeatureModule;
 import com.jelly.farmhelper.fabric.feature.module.AutoCookieFeatureModule;
+import com.jelly.farmhelper.fabric.feature.module.AutoFishingFeatureModule;
 import com.jelly.farmhelper.fabric.feature.module.AutoGodPotFeatureModule;
 import com.jelly.farmhelper.fabric.feature.module.AutoSprayonatorFeatureModule;
 import com.jelly.farmhelper.fabric.feature.module.AutoWardrobeFeatureModule;
@@ -154,6 +155,7 @@ public class FeatureManager {
             case "auto_reconnect" -> new AutoReconnectFeatureModule(enabled);
             case "auto_repellent" -> new AutoRepellentFeatureModule(enabled);
             case "usage_stats_tracker" -> new UsageStatsFeatureModule(enabled);
+            case "auto_fishing" -> new AutoFishingFeatureModule(enabled);
             case "auto_sell" -> new AutoSellFeatureModule(enabled);
             case "visitors_macro" -> new VisitorsFeatureModule(enabled);
             case "pests_destroyer" -> new PestsDestroyerFeatureModule(enabled);
@@ -176,6 +178,7 @@ public class FeatureManager {
             case "leave_timer" -> config.leaveTimerEnabled;
             case "auto_reconnect" -> config.autoReconnect;
             case "anti_stuck" -> config.antiStuckEnabled;
+            case "auto_fishing" -> config.enableAutoFishing;
             case "auto_sell" -> config.enableAutoSell;
             case "auto_cookie" -> config.autoCookie;
             case "auto_sprayonator" -> config.autoSprayonator;

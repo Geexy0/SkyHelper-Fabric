@@ -3,6 +3,7 @@ package com.jelly.farmhelper.fabric.automation;
 import com.jelly.farmhelper.fabric.FarmHelperFabric;
 import com.jelly.farmhelper.fabric.FarmHelperFabricClient;
 import com.jelly.farmhelper.fabric.config.FarmHelperConfig;
+import com.jelly.farmhelper.fabric.fishing.FishingWeaponMatcher;
 import com.jelly.farmhelper.fabric.macro.MacroState;
 import com.jelly.farmhelper.fabric.runtime.ClientActionQueue;
 import com.jelly.farmhelper.fabric.state.ClientModeController;
@@ -242,10 +243,34 @@ public class ClientAutomationExecutor {
             }
             return;
         }
+        if (query.startsWith("fishing-weapon:")) {
+            String prefs = payload.substring("fishing-weapon:".length()).trim();
+            int slot = findBestFishingWeaponSlot(client, prefs);
+            if (slot >= 0) {
+                client.player.getInventory().setSelectedSlot(slot);
+            }
+            return;
+        }
         int slot = findHotbarSlot(client, query);
         if (slot >= 0) {
             client.player.getInventory().setSelectedSlot(slot);
         }
+    }
+
+    private int findBestFishingWeaponSlot(Minecraft client, String preferenceCsv) {
+        if (client.player == null) {
+            return -1;
+        }
+        List<String> names = new ArrayList<>(9);
+        for (int slot = 0; slot < 9; slot++) {
+            ItemStack stack = client.player.getInventory().getItem(slot);
+            if (stack == null || stack.isEmpty()) {
+                names.add("");
+            } else {
+                names.add(stack.getHoverName().getString());
+            }
+        }
+        return FishingWeaponMatcher.pickBestHotbarIndex(names, preferenceCsv);
     }
 
     private void applyPerformanceMode(Minecraft client, String payload) {

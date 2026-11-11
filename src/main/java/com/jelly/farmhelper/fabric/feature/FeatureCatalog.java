@@ -15,6 +15,7 @@ public final class FeatureCatalog {
             new FeatureDefinition("auto_pest_exchange", "Auto Pest Exchange"),
             new FeatureDefinition("auto_reconnect", "Auto Reconnect"),
             new FeatureDefinition("auto_repellent", "Auto Repellent"),
+            new FeatureDefinition("auto_fishing", "Auto Fishing"),
             new FeatureDefinition("auto_sell", "Auto Sell"),
             new FeatureDefinition("auto_sprayonator", "Auto Sprayonator"),
             new FeatureDefinition("auto_wardrobe", "Auto Wardrobe"),

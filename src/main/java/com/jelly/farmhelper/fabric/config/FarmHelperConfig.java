@@ -192,6 +192,31 @@ public class FarmHelperConfig {
     public int pestsTracerColor = 0xAB00FFD9;
     public int pestsBoxColor = 0xAB56D8FF;
 
+    // Fishing aspect
+    public boolean enableAutoFishing = false;
+    public float fishingCastPitch = 45f;
+    public int fishingBiteTimeoutSeconds = 45;
+    public boolean fishingHumanizeMouse = true;
+    public boolean fishingMicroMove = false;
+    public boolean fishingAntiDetect = true;
+    public String fishingAntiDetectStrength = "NORMAL";
+    public boolean fishingIdleLook = true;
+    public float fishingIdleLookAmplitude = 2.5f;
+    public boolean fishingBreaksEnabled = true;
+    public int fishingBreakIntervalMinSeconds = 8 * 60;
+    public int fishingBreakIntervalMaxSeconds = 14 * 60;
+    public int fishingBreakLengthMinSeconds = 8;
+    public int fishingBreakLengthMaxSeconds = 25;
+    public int fishingSessionLimitMinutes = 0;
+    public boolean fishingKillSeaCreatures = true;
+    public float fishingSeaCreatureRange = 12f;
+    public int fishingCombatResumeDelayMs = 450;
+    public String fishingWeaponPreference = "hyperion,fire veil,frozen scythe,sword";
+    public boolean fishingTrophyMode = false;
+    public boolean fishingGoldenFishEsp = true;
+    public boolean fishingGoldenFishPriority = true;
+    public String fishingTrophyExtraNames = "";
+
     public boolean pestFarmer = false;
     public int pestFarmerWaitSeconds = 8;
     public boolean pestFarmerSwapEquipment = false;

@@ -52,4 +52,16 @@ public class FeatureRuntimeState {
     public double bits;
     public double copper;
     public Optional<FailsafeType> activeFailsafe = Optional.empty();
+
+    // Fishing sensors (client-populated)
+    public boolean fishingBobberPresent;
+    public boolean fishingBiteReady;
+    public boolean fishingHoldingRod;
+    public boolean fishingSeaCreatureNearby;
+    public String fishingNearestSeaCreature = "";
+    public boolean fishingGoldenFishVisible;
+    public String fishingGoldenFishName = "";
+    public double fishingGoldenFishX;
+    public double fishingGoldenFishY;
+    public double fishingGoldenFishZ;
 }

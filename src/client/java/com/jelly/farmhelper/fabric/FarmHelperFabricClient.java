@@ -3,6 +3,7 @@ package com.jelly.farmhelper.fabric;
 import com.jelly.farmhelper.fabric.automation.GuiDecisionEngine;
 import com.jelly.farmhelper.fabric.automation.ClientAutomationExecutor;
 import com.jelly.farmhelper.fabric.automation.PestEntityHeuristics;
+import com.jelly.farmhelper.fabric.fishing.ClientFishingSensor;
 import com.jelly.farmhelper.fabric.command.FarmHelperClientCommands;
 import com.jelly.farmhelper.fabric.event.MillisecondEvent;
 import com.jelly.farmhelper.fabric.event.MotionUpdateEvent;
@@ -436,6 +437,7 @@ public class FarmHelperFabricClient implements ClientModInitializer {
         MOVEMENT_MACRO_EXECUTOR.tick(client);
         tickMacroRecovery(client);
         updateFeatureRuntimeState();
+        ClientFishingSensor.update(client, FEATURE_RUNTIME_STATE, FarmHelperFabric.getConfigManager().getConfig());
         FarmHelperFabric.getFeatureManager().tickEnabledFeatures(FEATURE_RUNTIME_STATE);
         processClientActionQueue(client);
         tickPestEntityRendering(client);

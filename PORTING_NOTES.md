@@ -1,10 +1,12 @@
-# Porting notes (clean 26.3 fork — `26.3.0-clean.16`)
+# Porting notes (clean 26.3 fork — `26.3.0-clean.17`)
+
+## Fishing milestone (`clean.17`)
+
+Fishing aspect is live: auto cast/bite/reel, anti-detect timing/breaks/idle look, sea-creature kill with Hyperion / Fire Veil / Frozen Scythe auto-select, trophy mode + golden fish ESP/priority. Mining / Foraging remain Soon stubs.
 
 ## Farming milestone (`clean.16`)
 
-Farming aspect is the supported path for now: S-shape vertical crops (wheat/potato/carrot/nether wart + more presets), lane stuck/hop, post-warp camera, Jacob pause, visitors/sell/pests retries, hardened pest ESP, OneClient auto-install script.
-
-Next focus: **Fishing** (Mining / Foraging remain Soon stubs).
+Farming aspect: S-shape vertical crops, lane stuck/hop, post-warp camera, Jacob pause, visitors/sell/pests retries, hardened pest ESP, OneClient auto-install script.
 
 ## Target
 

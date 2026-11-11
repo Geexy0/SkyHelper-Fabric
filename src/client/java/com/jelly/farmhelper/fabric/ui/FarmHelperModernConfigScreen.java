@@ -53,7 +53,7 @@ public class FarmHelperModernConfigScreen extends FHScreen {
 
     private enum GameAspect {
         FARMING("Farming", "Garden macros, pests, visitors, and farm automation.", true),
-        FISHING("Fishing", "Coming soon — fishing helpers will land here next.", false),
+        FISHING("Fishing", "Auto cast/reel, sea creatures, trophy / golden fish, anti-detect.", true),
         MINING("Mining", "Coming soon — mining helpers will land here.", false),
         FORAGING("Foraging", "Coming soon — foraging helpers will land here.", false);
 
@@ -81,21 +81,28 @@ public class FarmHelperModernConfigScreen extends FHScreen {
     }
 
     private enum SettingSection {
-        QUICK_SETUP("Quick Setup", "Spawn, rewarp, crop profile, and the switches needed to start a farm."),
-        MACRO("Macro", "Lane movement, rotation, row timings, and macro-specific tuning."),
-        PESTS("Pests", "Pest destroyer, pest farmer, tracers, and aim behavior."),
-        VISITORS("Visitors", "Visitor filtering, reward rules, spending limits, and compactor handling."),
-        FAILSAFES("Failsafes", "Detection thresholds, alerts, and recovery behavior."),
-        AUTOMATION("Automation", "Scheduler, trading, upkeep, consumables, and helper flows."),
-        ADVANCED("Advanced", "HUD, proxy, keybinds, and direct feature module toggles."),
-        DASHBOARD("All", "Every farming setting in one searchable list.");
+        QUICK_SETUP("Quick Setup", "Spawn, rewarp, crop profile, and the switches needed to start a farm.", GameAspect.FARMING),
+        MACRO("Macro", "Lane movement, rotation, row timings, and macro-specific tuning.", GameAspect.FARMING),
+        PESTS("Pests", "Pest destroyer, pest farmer, tracers, and aim behavior.", GameAspect.FARMING),
+        VISITORS("Visitors", "Visitor filtering, reward rules, spending limits, and compactor handling.", GameAspect.FARMING),
+        FAILSAFES("Failsafes", "Detection thresholds, alerts, and recovery behavior.", GameAspect.FARMING),
+        AUTOMATION("Automation", "Scheduler, trading, upkeep, consumables, and helper flows.", GameAspect.FARMING),
+        ADVANCED("Advanced", "HUD, proxy, keybinds, and direct feature module toggles.", GameAspect.FARMING),
+        DASHBOARD("All", "Every farming setting in one searchable list.", GameAspect.FARMING),
+        FISH_SETUP("Quick Setup", "Enable auto fishing, cast pitch, bite timeout, humanize toggles.", GameAspect.FISHING),
+        FISH_ANTI("Anti-Detect", "Timing strength, idle look, breaks, and session limits.", GameAspect.FISHING),
+        FISH_COMBAT("Combat", "Sea creature kill range and weapon preferences.", GameAspect.FISHING),
+        FISH_TROPHY("Trophy", "Golden fish ESP / priority and extra trophy labels.", GameAspect.FISHING),
+        FISH_ALL("All", "Every fishing setting in one list.", GameAspect.FISHING);
 
         private final String label;
         private final String description;
+        private final GameAspect aspect;
 
-        SettingSection(String label, String description) {
+        SettingSection(String label, String description, GameAspect aspect) {
             this.label = label;
             this.description = description;
+            this.aspect = aspect;
         }
 
         public String label() {
@@ -104,6 +111,10 @@ public class FarmHelperModernConfigScreen extends FHScreen {
 
         public String description() {
             return description;
+        }
+
+        public GameAspect aspect() {
+            return aspect;
         }
     }
 
@@ -174,18 +185,19 @@ public class FarmHelperModernConfigScreen extends FHScreen {
         int subNavHeight = layout.subNavHeight;
         int gap = 6;
         for (SettingSection section : SettingSection.values()) {
+            final SettingSection boundSection = section;
             UiButton sub = new UiButton(
-                    () -> Component.literal((activeSection == section ? "> " : "") + section.label()),
-                    () -> setActiveSection(section)
+                    () -> Component.literal((activeSection == boundSection ? "> " : "") + boundSection.label()),
+                    () -> setActiveSection(boundSection)
             );
-            int btnWidth = Math.max(72, Math.min(118, (layout.contentWidth - gap * (SettingSection.values().length - 1)) / SettingSection.values().length));
+            int btnWidth = Math.max(64, Math.min(110, (layout.contentWidth - gap * 7) / 8));
             sub.setBounds(subNavX, subNavY, btnWidth, subNavHeight);
             farmingSubNavButtons.add(sub);
             root.addChild(sub);
             subNavX += btnWidth + gap;
         }
 
-        searchField = new UiTextField("Search farming options...");
+        searchField = new UiTextField("Search options...");
         searchField.setBounds(layout.contentLeft, layout.searchTop, layout.contentWidth, layout.searchHeight);
         searchField.setListener(this::onSearchChanged);
         root.addChild(searchField);
@@ -616,6 +628,45 @@ public class FarmHelperModernConfigScreen extends FHScreen {
                 return enabled != null && enabled;
             }, enabled -> setFeatureFromToggle(definition.id(), enabled));
         }
+
+        addHeader(SettingSection.FISH_SETUP, "Auto Fishing", "Cast, bite, reel loop. Stand at your spot and enable.");
+        addToggleSetting(SettingSection.FISH_SETUP, "Enable Auto Fishing", "Run the fishing cast/reel loop.", () -> config.enableAutoFishing, v -> {
+            config.enableAutoFishing = v;
+            setFeatureFromToggle("auto_fishing", v);
+        });
+        addFloatSetting(SettingSection.FISH_SETUP, "Cast Pitch", "Look pitch used when casting.", () -> config.fishingCastPitch, v -> config.fishingCastPitch = v, 0f, 90f);
+        addIntSetting(SettingSection.FISH_SETUP, "Bite Timeout (sec)", "Recast if no bite within this many seconds.", () -> config.fishingBiteTimeoutSeconds, v -> config.fishingBiteTimeoutSeconds = v, 10, 180);
+        addToggleSetting(SettingSection.FISH_SETUP, "Humanize Mouse", "Small look jitter while waiting.", () -> config.fishingHumanizeMouse, v -> config.fishingHumanizeMouse = v);
+        addToggleSetting(SettingSection.FISH_SETUP, "Micro Move", "Rare tiny look nudges (safe near lava).", () -> config.fishingMicroMove, v -> config.fishingMicroMove = v);
+
+        addHeader(SettingSection.FISH_ANTI, "Anti-Detect", "Randomized timings, idle looks, breaks, session limit.");
+        addToggleSetting(SettingSection.FISH_ANTI, "Anti-Detect Master", "Enable full humanization layer (default on).", () -> config.fishingAntiDetect, v -> config.fishingAntiDetect = v);
+        addEnumSetting(SettingSection.FISH_ANTI, "Timing Strength", "How wide delay distributions are.",
+                new String[]{"LOW", "NORMAL", "HIGH"},
+                () -> config.fishingAntiDetectStrength == null ? "NORMAL" : config.fishingAntiDetectStrength,
+                v -> config.fishingAntiDetectStrength = v,
+                v -> v);
+        addToggleSetting(SettingSection.FISH_ANTI, "Idle Look", "Occasional glance away while waiting.", () -> config.fishingIdleLook, v -> config.fishingIdleLook = v);
+        addFloatSetting(SettingSection.FISH_ANTI, "Idle Look Amplitude", "Degrees of idle look drift.", () -> config.fishingIdleLookAmplitude, v -> config.fishingIdleLookAmplitude = v, 0.5f, 12f);
+        addToggleSetting(SettingSection.FISH_ANTI, "AFK Breaks", "Pause fishing periodically like a human.", () -> config.fishingBreaksEnabled, v -> config.fishingBreaksEnabled = v);
+        addIntSetting(SettingSection.FISH_ANTI, "Break Interval Min (sec)", "Minimum seconds between breaks.", () -> config.fishingBreakIntervalMinSeconds, v -> config.fishingBreakIntervalMinSeconds = v, 60, 3600);
+        addIntSetting(SettingSection.FISH_ANTI, "Break Interval Max (sec)", "Maximum seconds between breaks.", () -> config.fishingBreakIntervalMaxSeconds, v -> config.fishingBreakIntervalMaxSeconds = v, 60, 7200);
+        addIntSetting(SettingSection.FISH_ANTI, "Break Length Min (sec)", "Minimum break length.", () -> config.fishingBreakLengthMinSeconds, v -> config.fishingBreakLengthMinSeconds = v, 2, 300);
+        addIntSetting(SettingSection.FISH_ANTI, "Break Length Max (sec)", "Maximum break length.", () -> config.fishingBreakLengthMaxSeconds, v -> config.fishingBreakLengthMaxSeconds = v, 2, 600);
+        addIntSetting(SettingSection.FISH_ANTI, "Session Limit (min)", "Stop after N minutes (0 = off).", () -> config.fishingSessionLimitMinutes, v -> config.fishingSessionLimitMinutes = v, 0, 720);
+
+        addHeader(SettingSection.FISH_COMBAT, "Sea Creatures", "Pause fishing to kill nearby sea creatures.");
+        addToggleSetting(SettingSection.FISH_COMBAT, "Kill Sea Creatures", "Auto-detect and fight nearby sea creatures.", () -> config.fishingKillSeaCreatures, v -> config.fishingKillSeaCreatures = v);
+        addFloatSetting(SettingSection.FISH_COMBAT, "Combat Range", "Max distance to engage sea creatures.", () -> config.fishingSeaCreatureRange, v -> config.fishingSeaCreatureRange = v, 4f, 32f);
+        addIntSetting(SettingSection.FISH_COMBAT, "Resume Delay (ms)", "Settle delay after combat before fishing.", () -> config.fishingCombatResumeDelayMs, v -> config.fishingCombatResumeDelayMs = v, 100, 3000);
+        addTextSetting(SettingSection.FISH_COMBAT, "Weapon Preference", "Comma list: hyperion, fire veil, frozen scythe, sword.", () -> config.fishingWeaponPreference, v -> config.fishingWeaponPreference = v, 256);
+
+        addHeader(SettingSection.FISH_TROPHY, "Trophy / Golden Fish", "Crimson Isle trophy helpers.");
+        addToggleSetting(SettingSection.FISH_TROPHY, "Trophy Mode", "Enable trophy fishing extras.", () -> config.fishingTrophyMode, v -> config.fishingTrophyMode = v);
+        addToggleSetting(SettingSection.FISH_TROPHY, "Golden Fish ESP", "Tracer/box for golden fish.", () -> config.fishingGoldenFishEsp, v -> config.fishingGoldenFishEsp = v);
+        addToggleSetting(SettingSection.FISH_TROPHY, "Golden Fish Priority", "Face and focus when golden fish is nearby.", () -> config.fishingGoldenFishPriority, v -> config.fishingGoldenFishPriority = v);
+        addTextSetting(SettingSection.FISH_TROPHY, "Extra Trophy Names", "CSV of extra trophy entity name fragments.", () -> config.fishingTrophyExtraNames, v -> config.fishingTrophyExtraNames = v, 256);
+        // FISH_ALL is a filter that shows every fishing section row (like farming Dashboard).
     }
 
     private void addToggleSetting(SettingSection section, String title, String description, UiToggle.BooleanGetter getter, UiToggle.BooleanSetter setter) {
@@ -758,8 +809,10 @@ public class FarmHelperModernConfigScreen extends FHScreen {
             return;
         }
         activeAspect = aspect;
-        if (aspect.available() && activeSection == null) {
+        if (aspect == GameAspect.FARMING) {
             activeSection = SettingSection.QUICK_SETUP;
+        } else if (aspect == GameAspect.FISHING) {
+            activeSection = SettingSection.FISH_SETUP;
         }
         if (scrollContainer != null) {
             scrollContainer.scrollToTop();
@@ -771,7 +824,7 @@ public class FarmHelperModernConfigScreen extends FHScreen {
         if (section == null) {
             return;
         }
-        activeAspect = GameAspect.FARMING;
+        activeAspect = section.aspect();
         activeSection = section;
         if (scrollContainer != null) {
             scrollContainer.scrollToTop();
@@ -784,21 +837,44 @@ public class FarmHelperModernConfigScreen extends FHScreen {
             return;
         }
         LayoutMetrics layout = layoutMetrics == null ? LayoutMetrics.forScreen(width, height) : layoutMetrics;
-        boolean farming = activeAspect == GameAspect.FARMING;
+        boolean interactive = activeAspect.available();
 
-        for (UiButton sub : farmingSubNavButtons) {
-            sub.setVisible(farming);
-            sub.setEnabled(farming);
+        int visibleSubCount = 0;
+        for (int i = 0; i < farmingSubNavButtons.size() && i < SettingSection.values().length; i++) {
+            SettingSection section = SettingSection.values()[i];
+            UiButton sub = farmingSubNavButtons.get(i);
+            boolean show = interactive && section.aspect() == activeAspect;
+            sub.setVisible(show);
+            sub.setEnabled(show);
+            if (show) {
+                visibleSubCount++;
+            }
         }
+        // Relayout visible sub-nav buttons left-aligned.
+        if (interactive && visibleSubCount > 0) {
+            int gap = 6;
+            int btnWidth = Math.max(64, Math.min(118, (layout.contentWidth - gap * (visibleSubCount - 1)) / visibleSubCount));
+            int subNavX = layout.contentLeft;
+            for (int i = 0; i < farmingSubNavButtons.size() && i < SettingSection.values().length; i++) {
+                SettingSection section = SettingSection.values()[i];
+                UiButton sub = farmingSubNavButtons.get(i);
+                if (section.aspect() != activeAspect) {
+                    continue;
+                }
+                sub.setBounds(subNavX, layout.subNavTop, btnWidth, layout.subNavHeight);
+                subNavX += btnWidth + gap;
+            }
+        }
+
         if (searchField != null) {
-            searchField.setVisible(farming);
+            searchField.setVisible(interactive);
         }
         if (soonPanel != null) {
-            soonPanel.setVisible(!farming);
+            soonPanel.setVisible(!interactive);
         }
-        scrollContainer.setVisible(farming);
+        scrollContainer.setVisible(interactive);
 
-        if (!farming) {
+        if (!interactive) {
             for (SettingRow row : allRows) {
                 row.setVisible(false);
             }
@@ -811,11 +887,13 @@ public class FarmHelperModernConfigScreen extends FHScreen {
         int x = scrollContainer.getX() + 8;
         int width = scrollContainer.getWidth() - 16;
 
+        boolean showAll = activeSection == SettingSection.DASHBOARD || activeSection == SettingSection.FISH_ALL;
         for (SettingRow row : allRows) {
             row.setLayout(layout);
-            boolean sectionMatch = activeSection == SettingSection.DASHBOARD || row.section == activeSection;
+            boolean aspectMatch = row.section.aspect() == activeAspect;
+            boolean sectionMatch = showAll || row.section == activeSection;
             boolean searchMatch = lower.isEmpty() || row.titleLower.contains(lower) || row.descriptionLower.contains(lower);
-            boolean visible = sectionMatch && searchMatch;
+            boolean visible = aspectMatch && sectionMatch && searchMatch;
             row.setVisible(visible);
             if (visible) {
                 int rowHeight = row.preferredHeight();
