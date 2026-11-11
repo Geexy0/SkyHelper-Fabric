@@ -3,7 +3,7 @@
   "id": "${mod_id}",
   "version": "${version}",
   "name": "${mod_name}",
-  "description": "FarmHelper Fabric for Minecraft 26.3 — no Discord, no analytics.",
+  "description": "SkyHelper Fabric for Minecraft 26.3 — Farming + Fishing aspects; no Discord, no analytics.",
   "authors": [
     "JellyLabScripts",
     "BetterFarmHelper contributors",

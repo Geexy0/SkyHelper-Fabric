@@ -1,4 +1,6 @@
-# Porting notes (clean 26.3 fork — `26.3.0-clean.17`)
+# Porting notes — SkyHelper Fabric (`26.3.0-clean.17`)
+
+Public repo: [Geexy0/SkyHelper-Fabric](https://github.com/Geexy0/SkyHelper-Fabric) (renamed from FarmHelper-Fabric).
 
 ## Fishing milestone (`clean.17`)
 

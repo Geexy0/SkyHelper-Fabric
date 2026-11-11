@@ -1,6 +1,6 @@
-# FarmHelper Fabric release checklist
+# SkyHelper Fabric release checklist
 
-Match the [Geexy0/FarmHelper-Fabric](https://github.com/Geexy0/FarmHelper-Fabric) publish flow.
+Match the [Geexy0/SkyHelper-Fabric](https://github.com/Geexy0/SkyHelper-Fabric) publish flow.
 
 ## Before tagging
 
