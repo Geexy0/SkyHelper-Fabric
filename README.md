@@ -83,6 +83,12 @@ build/libs/farmhelper-fabric-<version>.jar
 - Proxy username/password fields exist for optional SOCKS/HTTP proxy use; leave them blank unless you configure a proxy yourself
 - Your personal `farmhelper-fabric.json` and Minecraft `options.txt` are **local only** — not part of this repository
 
+## Status (clean.16)
+
+- **Farming** — primary supported aspect (lanes, pests, visitors/sell, HUD). Treat as the “good for now” farming baseline.
+- **Fishing** — next up.
+- **Mining / Foraging** — UI stubs only (“Soon”).
+
 ## Disclaimer
 
 Automated macros may violate Hypixel or other server rules. Use at your own risk. This project is provided as-is for personal / educational use. The authors are not responsible for bans, losses, or account actions.

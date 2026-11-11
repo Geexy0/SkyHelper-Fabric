@@ -1,4 +1,10 @@
-# Porting notes (clean 26.3 fork — `26.3.0-clean.13`)
+# Porting notes (clean 26.3 fork — `26.3.0-clean.16`)
+
+## Farming milestone (`clean.16`)
+
+Farming aspect is the supported path for now: S-shape vertical crops (wheat/potato/carrot/nether wart + more presets), lane stuck/hop, post-warp camera, Jacob pause, visitors/sell/pests retries, hardened pest ESP, OneClient auto-install script.
+
+Next focus: **Fishing** (Mining / Foraging remain Soon stubs).
 
 ## Target
 

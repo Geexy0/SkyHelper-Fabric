@@ -53,6 +53,7 @@ public class FarmHelperModernConfigScreen extends FHScreen {
 
     private enum GameAspect {
         FARMING("Farming", "Garden macros, pests, visitors, and farm automation.", true),
+        FISHING("Fishing", "Coming soon — fishing helpers will land here next.", false),
         MINING("Mining", "Coming soon — mining helpers will land here.", false),
         FORAGING("Foraging", "Coming soon — foraging helpers will land here.", false);
 
