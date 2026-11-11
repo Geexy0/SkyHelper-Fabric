@@ -1331,7 +1331,7 @@ public class FarmHelperFabricClient implements ClientModInitializer {
         if (!wantTracers && !wantBoxes) {
             return;
         }
-        // Only render pest ESP while in the garden.
+        // Only render pest ESP on garden island. Never in hub/lobby (ambient bats).
         GameStateHandler.Location loc = GAME_STATE_HANDLER.getLocation();
         if (loc != GameStateHandler.Location.GARDEN && loc != GameStateHandler.Location.BARN) {
             return;

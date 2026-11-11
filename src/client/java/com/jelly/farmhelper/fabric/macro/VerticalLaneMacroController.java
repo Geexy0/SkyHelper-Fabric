@@ -173,11 +173,11 @@ final class VerticalLaneMacroController implements LegacyMovementController {
         MovementMacroExecutor.Walkability walkability = executor.computeWalkability(client, routingYaw);
         switch (state) {
             case LEFT -> {
-                boolean forward = config.alwaysHoldW || PlayerUtils.shouldWalkForwards(client) || forwardHopTicks > 0;
-                // Water / slab ledge: nudge forward briefly so hops clear the edge.
-                if (!forward && (walkability.front() || executor.hasForwardWaterOrSlabHop(client, routingYaw))) {
-                    forward = true;
-                }
+                // Do NOT hold W just because front is walkable — that diagonal-drifts wheat/potato rows.
+                // Forward only via alwaysHoldW, classic edge nudge, or an explicit stuck hop pulse.
+                boolean forward = config.alwaysHoldW
+                        || PlayerUtils.shouldWalkForwards(client)
+                        || forwardHopTicks > 0;
                 if (forwardHopTicks > 0) {
                     forwardHopTicks--;
                 }
@@ -185,10 +185,9 @@ final class VerticalLaneMacroController implements LegacyMovementController {
                 executor.setDirectionLabel(forwardHopTicks > 0 ? "LEFT_HOP" : "LEFT");
             }
             case RIGHT -> {
-                boolean forward = config.alwaysHoldW || PlayerUtils.shouldWalkForwards(client) || forwardHopTicks > 0;
-                if (!forward && (walkability.front() || executor.hasForwardWaterOrSlabHop(client, routingYaw))) {
-                    forward = true;
-                }
+                boolean forward = config.alwaysHoldW
+                        || PlayerUtils.shouldWalkForwards(client)
+                        || forwardHopTicks > 0;
                 if (forwardHopTicks > 0) {
                     forwardHopTicks--;
                 }

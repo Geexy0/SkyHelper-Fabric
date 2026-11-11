@@ -15,6 +15,12 @@ class PestEntityHeuristicsTest {
         assertFalse(heuristics.isEspPestSignals("§7Bat", "entity.minecraft.bat", ""));
         assertFalse(heuristics.isEspPestSignals("Pest", "entity.minecraft.bat", ""));
         assertFalse(heuristics.isEspPestSignals("pest 1", "entity.minecraft.bat", ""));
+        // Accidental texture-hash substring in NBT must not promote hub bats.
+        assertFalse(heuristics.isEspPestSignals(
+                "Bat",
+                "entity.minecraft.bat",
+                "random nbt 70a1e836bf1968b2 noise"
+        ));
         assertFalse(heuristics.isLikelyPestSignals("Bat", "entity.minecraft.bat", "", "", true, true));
     }
 

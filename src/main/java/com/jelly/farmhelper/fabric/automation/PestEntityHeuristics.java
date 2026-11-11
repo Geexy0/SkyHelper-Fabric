@@ -182,11 +182,13 @@ public class PestEntityHeuristics {
         if (containsAny(t, HARD_REJECT_TYPE_KEYWORDS)) {
             return false;
         }
-        if (hasTextureSignature(eq)) {
-            return true;
-        }
+        // Bare reused mobs (hub bats, silverfish, etc.) never pass — even if equipment NBT
+        // accidentally contains a texture-hash substring.
         if (isBareReusedMob(n, t)) {
             return false;
+        }
+        if (hasTextureSignature(eq)) {
+            return true;
         }
         // Must be an explicit pest species name (not generic "pest", not vanilla "Bat").
         return hasPestSpecies(n);

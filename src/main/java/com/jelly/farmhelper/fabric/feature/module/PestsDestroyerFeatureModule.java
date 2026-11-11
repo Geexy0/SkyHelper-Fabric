@@ -225,6 +225,14 @@ public class PestsDestroyerFeatureModule extends MacroExclusiveFeatureModule {
     private void tickState(FeatureRuntimeState runtime, FarmHelperConfig config) {
         switch (state) {
             case CHECK_START_POINT -> {
+                // Tablist already knows the plot — skip barn/desk teleport spam.
+                int knownPlot = resolveTargetPlot(runtime);
+                if (knownPlot > 0) {
+                    targetPlot = knownPlot;
+                    lastKnownInfestedPlot = knownPlot;
+                    setState(State.TELEPORT_TO_PLOT, runtime.tickCount, true);
+                    return;
+                }
                 if (isEntryTick(runtime.tickCount)) {
                     if (config.pestsDestroyerStartOnlyOnRewarpOrSpawn
                             && !(runtime.nearSpawnPoint || runtime.nearRewarpPoint)) {
@@ -236,6 +244,14 @@ public class PestsDestroyerFeatureModule extends MacroExclusiveFeatureModule {
                 }
             }
             case TRAVEL_TO_BARN -> {
+                // Plot may have appeared in tab while traveling — skip desk.
+                int knownPlot = resolveTargetPlot(runtime);
+                if (knownPlot > 0) {
+                    targetPlot = knownPlot;
+                    lastKnownInfestedPlot = knownPlot;
+                    setState(State.TELEPORT_TO_PLOT, runtime.tickCount, true);
+                    return;
+                }
                 if (isEntryTick(runtime.tickCount)) {
                     if (runtime.currentPlot != 0) {
                         queueCommand("/tptoplot barn", runtime.tickCount);
@@ -246,6 +262,13 @@ public class PestsDestroyerFeatureModule extends MacroExclusiveFeatureModule {
                 }
             }
             case SWAP_ARMOR -> {
+                int knownAfterArmor = resolveTargetPlot(runtime);
+                if (knownAfterArmor > 0 && ticksInState(runtime.tickCount) >= 10L && isQueueEmpty()) {
+                    targetPlot = knownAfterArmor;
+                    lastKnownInfestedPlot = knownAfterArmor;
+                    setState(State.TELEPORT_TO_PLOT, runtime.tickCount, true);
+                    return;
+                }
                 if (isEntryTick(runtime.tickCount)) {
                     if (config.pestFarmerSwapEquipment || config.autoWardrobe) {
                         int preferredSlot = Math.max(1, config.autoWardrobePreferredSlot);
@@ -932,6 +955,9 @@ public class PestsDestroyerFeatureModule extends MacroExclusiveFeatureModule {
         }
         if (runtime.mostInfestedPlot > 0) {
             return runtime.mostInfestedPlot;
+        }
+        if (runtime.guiInfestedPlot > 0) {
+            return runtime.guiInfestedPlot;
         }
         if (lastKnownInfestedPlot > 0) {
             return lastKnownInfestedPlot;

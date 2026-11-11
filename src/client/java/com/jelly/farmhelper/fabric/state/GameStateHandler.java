@@ -71,15 +71,25 @@ public final class GameStateHandler {
     private void updateLocation(List<String> scoreboard, List<String> tablist, LocalPlayer player) {
         String aggregate = String.join(" ", scoreboard).toLowerCase(Locale.ROOT);
         String tabAggregate = String.join(" ", tablist).toLowerCase(Locale.ROOT);
-        if (aggregate.contains("garden") || tabAggregate.contains("garden")) {
-            location = Location.GARDEN;
-            locationSource = "scoreboard/tablist";
-        } else if (aggregate.contains("barn")) {
-            location = Location.BARN;
-            locationSource = "scoreboard";
-        } else if (aggregate.contains("hub") || tabAggregate.contains("village")) {
+        // Hub tablists often list "Garden" as a warp destination — never treat tab-only
+        // "garden" as proof we are on the garden island (that caused hub bat ESP).
+        boolean scoreboardHub = aggregate.contains("hub")
+                || aggregate.contains("village")
+                || aggregate.contains("⏣ hub");
+        boolean tabHub = tabAggregate.contains("area: hub")
+                || tabAggregate.contains("area: village");
+        boolean scoreboardGarden = aggregate.contains("garden") || aggregate.contains("⏣ garden");
+        boolean scoreboardBarn = aggregate.contains("barn") || aggregate.contains("⏣ barn");
+
+        if (scoreboardHub || tabHub) {
             location = Location.HUB;
             locationSource = "scoreboard/tablist";
+        } else if (scoreboardGarden) {
+            location = Location.GARDEN;
+            locationSource = "scoreboard";
+        } else if (scoreboardBarn) {
+            location = Location.BARN;
+            locationSource = "scoreboard";
         } else if (aggregate.contains("private island")) {
             location = Location.PRIVATE_ISLAND;
             locationSource = "scoreboard";
@@ -101,10 +111,13 @@ public final class GameStateHandler {
         if (plot.isPresent()) {
             currentPlot = plot.get();
             currentPlotName = PlotUtils.getPlotName(currentPlot);
-            if (currentPlot == 0) {
+            // Plot coords only upgrade location when we are not clearly elsewhere (hub/lobby).
+            if (location == Location.HUB || location == Location.LOBBY || location == Location.LIMBO) {
+                // keep hub/lobby — garden plot math can false-match outside the garden
+            } else if (currentPlot == 0) {
                 location = Location.BARN;
                 locationSource = "plot";
-            } else if (location == Location.OTHER) {
+            } else if (location == Location.OTHER || location == Location.GARDEN || location == Location.BARN) {
                 location = Location.GARDEN;
                 locationSource = "plot";
             }
