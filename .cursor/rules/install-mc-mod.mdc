@@ -1,0 +1,31 @@
+---
+description: After every new FarmHelper version build/release, replace the JAR in Vivien's OneClient 26.3 mods folder
+alwaysApply: true
+---
+
+# Install JAR into OneClient mods on each new version
+
+Whenever this project ships a new `mod_version` (build, tag, or GitHub release of `farmhelper-fabric-*.jar`):
+
+1. Run `./scripts/install-to-oneclient.sh` from the repo root (or the equivalent commands below).
+2. Do this **after** `./gradlew build` (or `jar`) succeeds and the release JAR exists under `build/libs/`.
+3. Confirm the mods folder contains exactly one FarmHelper JAR matching the new version.
+
+## Target
+
+```text
+/home/geexy/.local/share/Polyfrost/OneClient/.minecraft/mods/26.3 Fabric/
+```
+
+## Required behavior
+
+- Delete **only** previous FarmHelper artifacts in that folder:
+  - `farmhelper-fabric-*.jar`
+  - `FarmHelper*.jar` (legacy names, if any)
+- Do **not** delete other mods or OneClient package symlinks.
+- Copy the new release JAR (not `-sources.jar`, not `-dev.jar`) into that folder.
+- Prefer the script: `./scripts/install-to-oneclient.sh [optional/path/to.jar]`
+
+## Do not skip
+
+Shipping a new `26.3.0-clean.N` (or any later version) without updating this mods folder is incomplete work for this project.

@@ -21,7 +21,15 @@ Match the [Geexy0/FarmHelper-Fabric](https://github.com/Geexy0/FarmHelper-Fabric
 2. Tag: `v26.3.0-clean.N`
 3. Create GitHub Release for that tag.
 4. Attach the release JAR (not sources).
-5. Smoke: drop JAR into a 26.3 Fabric client, open `/fh ui`, start/stop once.
+5. **Install into OneClient mods** (deletes old FarmHelper JARs, copies the new one):
+
+```bash
+./scripts/install-to-oneclient.sh
+```
+
+Target: `/home/geexy/.local/share/Polyfrost/OneClient/.minecraft/mods/26.3 Fabric/`
+
+6. Smoke: launch 26.3 Fabric, open `/fh ui`, start/stop once.
 
 ## Privacy reminders
 
