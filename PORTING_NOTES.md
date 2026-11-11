@@ -24,7 +24,9 @@ Removed / neutralized versus older FarmHelper builds:
 
 ## Presets
 
-- `S_WHEAT` — S-shape vertical wheat with forced yaw **-90** and pitch **0**
+- `S_WHEAT` / `S_POTATO` / `S_CARROT` — S-shape vertical with forced yaw **-90** and pitch **0**
+- `S_NETHER_WART` — S-shape with pitch **~3.0**
+- Pest ESP requires an explicit pest species name or texture hash (bare bats rejected)
 
 ## Still WIP
 
