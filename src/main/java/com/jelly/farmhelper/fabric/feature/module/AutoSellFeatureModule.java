@@ -14,10 +14,13 @@ public class AutoSellFeatureModule extends MacroExclusiveFeatureModule {
         FINISH
     }
 
+    private static final int GUI_RETRY_LIMIT = 5;
+
     private State state = State.IDLE;
     private long stateSinceTick = 0L;
     private long inventoryFullSinceTick = -1L;
     private long lastSellActionTick = -1L;
+    private int stateRetries;
 
     public AutoSellFeatureModule(boolean enabled) {
         super("auto_sell", "Auto Sell", enabled);
@@ -89,7 +92,7 @@ public class AutoSellFeatureModule extends MacroExclusiveFeatureModule {
             return;
         }
 
-        long actionBudget = cooldownTicks + 220L;
+        long actionBudget = cooldownTicks + 220L + (long) GUI_RETRY_LIMIT * 40L;
         if (!beginTimedAction(runtime.tickCount, actionBudget, "inventory threshold reached")) {
             return;
         }
@@ -116,25 +119,36 @@ public class AutoSellFeatureModule extends MacroExclusiveFeatureModule {
             }
             case WAIT_MARKET_SCREEN -> {
                 if (ticksInState(runtime.tickCount) == 0) {
-                    queueWaitForScreen(config.autoSellMarketTypeNpc ? "trades" : "bazaar", 160L, 5, runtime.tickCount);
+                    queueWaitForScreen(config.autoSellMarketTypeNpc ? "trades" : "bazaar", 160L, GUI_RETRY_LIMIT, runtime.tickCount);
                 }
-                if (ticksInState(runtime.tickCount) >= 40L) {
+                if (ticksInState(runtime.tickCount) >= 50L) {
+                    String title = runtime.screenTitle == null ? "" : runtime.screenTitle;
+                    boolean marketOpen = !title.isBlank()
+                            && (title.toLowerCase(java.util.Locale.ROOT).contains("trade")
+                            || title.toLowerCase(java.util.Locale.ROOT).contains("bazaar")
+                            || title.toLowerCase(java.util.Locale.ROOT).contains("sell"));
+                    if (!marketOpen && stateRetries < GUI_RETRY_LIMIT) {
+                        stateRetries++;
+                        queueCloseScreen(runtime.tickCount);
+                        setState(State.OPEN_MARKET, runtime.tickCount);
+                        return;
+                    }
                     setState(State.SELL_ITEMS, runtime.tickCount);
                 }
             }
             case SELL_ITEMS -> {
                 if (ticksInState(runtime.tickCount) == 0) {
-                    queueClickSlotMatching("name:sell inventory;lore:items", 80L, 5, runtime.tickCount);
-                    queueClickSlotMatching("name:insta-sell;lore:sell", 80L, 5, runtime.tickCount);
-                    queueClickSlotMatching("name:sell", 60L, 3, runtime.tickCount);
+                    queueClickSlotMatching("name:sell inventory;lore:items", 80L, GUI_RETRY_LIMIT, runtime.tickCount);
+                    queueClickSlotMatching("name:insta-sell;lore:sell", 80L, GUI_RETRY_LIMIT, runtime.tickCount);
+                    queueClickSlotMatching("name:sell", 60L, Math.max(3, GUI_RETRY_LIMIT - 1), runtime.tickCount);
                     for (String custom : config.autoSellCustomItems.split(",")) {
                         String normalized = custom.trim();
                         if (!normalized.isEmpty()) {
-                            queueClickSlotMatching("name:" + normalized, 60L, 2, runtime.tickCount);
+                            queueClickSlotMatching("name:" + normalized, 60L, 3, runtime.tickCount);
                         }
                     }
                 }
-                if (ticksInState(runtime.tickCount) >= 30L) {
+                if (ticksInState(runtime.tickCount) >= 36L) {
                     setState(State.CLOSE_SCREEN, runtime.tickCount);
                 }
             }
@@ -169,5 +183,6 @@ public class AutoSellFeatureModule extends MacroExclusiveFeatureModule {
         state = State.IDLE;
         stateSinceTick = 0L;
         inventoryFullSinceTick = -1L;
+        stateRetries = 0;
     }
 }

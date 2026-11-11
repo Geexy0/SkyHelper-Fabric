@@ -9,6 +9,9 @@ public final class LegacyMacroProfiles {
     static {
         PROFILES.put(LegacyMacroType.S_V_NORMAL_TYPE, new MacroStrategyProfile(MacroPattern.S_SHAPE, 140, 14, true));
         PROFILES.put(LegacyMacroType.S_WHEAT, new MacroStrategyProfile(MacroPattern.S_SHAPE, 140, 14, true));
+        PROFILES.put(LegacyMacroType.S_POTATO, new MacroStrategyProfile(MacroPattern.S_SHAPE, 140, 14, true));
+        PROFILES.put(LegacyMacroType.S_CARROT, new MacroStrategyProfile(MacroPattern.S_SHAPE, 140, 14, true));
+        PROFILES.put(LegacyMacroType.S_NETHER_WART, new MacroStrategyProfile(MacroPattern.S_SHAPE, 136, 14, true));
         PROFILES.put(LegacyMacroType.S_PUMPKIN_MELON, new MacroStrategyProfile(MacroPattern.S_SHAPE, 150, 16, true));
         PROFILES.put(LegacyMacroType.S_PUMPKIN_MELON_MELONGKINGDE, new MacroStrategyProfile(MacroPattern.S_SHAPE, 148, 16, true));
         PROFILES.put(LegacyMacroType.S_PUMPKIN_MELON_DEFAULT_PLOT, new MacroStrategyProfile(MacroPattern.S_SHAPE, 142, 16, true));

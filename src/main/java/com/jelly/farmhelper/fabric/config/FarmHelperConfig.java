@@ -136,7 +136,7 @@ public class FarmHelperConfig {
     public float visitorsMacroMaxSpendLimit = 0.7f;
     public boolean visitorsMacroAfkInfiniteMode = false;
     public int visitorsMacroMaxVisitorsPerCycle = 3;
-    public int visitorsMacroRetryLimit = 3;
+    public int visitorsMacroRetryLimit = 5;
     public String visitorsMacroBlacklistCsv = "";
     public String visitorsMacroWhitelistCsv = "";
     public boolean filterVisitorsByName = false;
@@ -175,7 +175,7 @@ public class FarmHelperConfig {
     public int pestsDestroyerActionSeconds = 15;
     public boolean pestsDestroyerAfkInfiniteMode = false;
     public int pestsDestroyerMaxPasses = 3;
-    public int pestsDestroyerRetryLimit = 3;
+    public int pestsDestroyerRetryLimit = 5;
     public boolean pestsDestroyerDontTeleportToPlots = false;
     public int pestsDestroyerCantReachTicks = 100;
     public boolean pestsDestroyerDisableDuringJacobsContest = true;

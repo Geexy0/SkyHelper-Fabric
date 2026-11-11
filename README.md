@@ -9,7 +9,7 @@ This **clean** build ships **without Discord webhooks, remote control, or analyt
 Automates Hypixel SkyBlock garden farming macros:
 
 - **Crop macros** — S-shape / vertical lanes, sugar cane, cocoa, cactus, mushroom variants, circular crops
-- **Wheat preset** — `S_WHEAT` locks camera to **yaw -90 / pitch 0**
+- **Crop presets** — `S_WHEAT` / `S_POTATO` / `S_CARROT` lock camera to **yaw -90 / pitch 0**; `S_NETHER_WART` uses pitch **~3.0**
 - **Failsafes** — disconnect, teleport, rotation, knockback, inventory, chat keywords, low BPS, and related detectors
 - **Automation modules** — visitors, pests, auto-sell, reconnect, cookie/god pot/repellent, bazaar helpers, and more
 - **In-game config UI** — `/fh ui` (Print Screen by default on this build)
@@ -30,7 +30,7 @@ Install like any Fabric client mod: drop the release JAR into your `mods` folder
 
 1. Join SkyBlock and warp to your **Garden**.
 2. Open settings: `/fh ui` or the Open Menu keybind.
-3. Pick a **Macro Type** (e.g. `S Shape - Wheat (Yaw -90 / Pitch 0)`).
+3. Pick a **Macro Type** (e.g. wheat/potato/carrot/nether wart) and tap **Apply Preset** in Quick Setup if needed.
 4. Optional: stand on a pad → `/fh rewarp add`. Set spawn with `/fh spawn set`.
 5. Start: `/fh start` or the Start / Toggle keybind.
 6. Stop: `/fh stop`.
@@ -49,7 +49,15 @@ Install like any Fabric client mod: drop the release JAR into your `mods` folder
 /fh config save|reload
 ```
 
-Keybinds live under **Controls → FarmHelper**.
+Keybinds live under **Options → Controls → FarmHelper** (authoritative). Advanced settings show SDL scancodes with key names; prefer rebinding in Controls rather than editing the numbers.
+
+### Manual UI checklist (after SDL mouse fix)
+
+1. `/fh ui` opens; sidebar section switching works (Quick Setup → Macro → …).
+2. Left-click toggles, dropdowns, and text fields respond.
+3. Search filters setting rows.
+4. Escape / close button dismisses the screen.
+5. With macro running and a rewarp/pest marker active, HUD shows projected box/tracer/text overlays.
 
 ## Build from source
 

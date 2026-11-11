@@ -231,7 +231,7 @@ public class VisitorsFeatureModule extends MacroExclusiveFeatureModule {
                 if (isEntryTick(runtime.tickCount)) {
                     queueRotateTo(runtime.yaw + 60f, Math.max(-60f, Math.min(85f, runtime.pitch + 10f)), 8L, runtime.tickCount);
                     queueUseHeldItem(runtime.tickCount);
-                    queueWaitForScreen("compactor", 80L, 2, runtime.tickCount);
+                    queueWaitForScreen("compactor", 80L, Math.max(3, config.visitorsMacroRetryLimit), runtime.tickCount);
                 }
                 if (runtime.screenOpen && runtime.screenTitle != null
                         && runtime.screenTitle.toLowerCase(Locale.ROOT).contains("compactor")) {
@@ -401,7 +401,7 @@ public class VisitorsFeatureModule extends MacroExclusiveFeatureModule {
                     queueCommand("/visitors", runtime.tickCount);
                     queueMoveToEntity("visitor,new visitor", 3.5, 200L, runtime.tickCount);
                     queueInteractNearestEntity("visitor,new visitor", 4.0, 120L, runtime.tickCount);
-                    queueWaitForScreen("visitor", 120L, 2, runtime.tickCount);
+                    queueWaitForScreen("visitor", 120L, Math.max(3, config.visitorsMacroRetryLimit), runtime.tickCount);
                 }
                 if (runtime.screenOpen && runtime.screenTitle != null
                         && runtime.screenTitle.toLowerCase(Locale.ROOT).contains("visitor")) {

@@ -8,6 +8,7 @@ import net.minecraft.client.Minecraft;
 final class VerticalLaneMacroController implements LegacyMovementController {
     private final MovementMacroExecutor executor;
     private ChangeLaneDirection changeLaneDirection;
+    private int stuckNoExitTicks;
 
     VerticalLaneMacroController(MovementMacroExecutor executor) {
         this.executor = executor;
@@ -28,36 +29,47 @@ final class VerticalLaneMacroController implements LegacyMovementController {
                 boolean wantsRight = state == MovementMacroExecutor.LegacyRouteState.RIGHT;
                 executor.setMoveRight(wantsRight);
                 boolean sideWalkable = wantsRight ? walkability.right() : walkability.left();
-                if (sideWalkable) {
+                boolean allowBack = executor.getActiveType() != LegacyMacroType.S_CACTUS
+                        && executor.getActiveType() != LegacyMacroType.S_CACTUS_SUNTZU
+                        && !config.alwaysHoldW;
+                boolean frontOk = walkability.front() && !config.alwaysHoldW;
+                boolean backOk = walkability.back() && allowBack;
+                VerticalLaneStuckLogic.Decision decision = VerticalLaneStuckLogic.decideWhileStrafing(
+                        sideWalkable,
+                        frontOk,
+                        backOk,
+                        true,
+                        stuckNoExitTicks
+                );
+                if (decision == VerticalLaneStuckLogic.Decision.CONTINUE_SIDE) {
+                    stuckNoExitTicks = 0;
                     executor.startLegacyAntiStuckPulse(config);
                     return;
                 }
-                if (walkability.front() && !config.alwaysHoldW) {
+                if (decision == VerticalLaneStuckLogic.Decision.SWITCH_LANE) {
+                    stuckNoExitTicks = 0;
                     if (executor.isStuckInMelonsOrPumpkins(client, routingYaw)) {
                         executor.startLegacyAntiStuckPulse(config);
                         return;
                     }
-                    executor.setRouteState(MovementMacroExecutor.LegacyRouteState.SWITCHING_LANE);
-                    executor.setLegacyWalkingDirection(client, routingYaw);
-                    return;
-                }
-                if (walkability.back()
-                        && executor.getActiveType() != LegacyMacroType.S_CACTUS
-                        && executor.getActiveType() != LegacyMacroType.S_CACTUS_SUNTZU
-                        && !config.alwaysHoldW) {
-                    if (executor.isStuckInMelonsOrPumpkins(client, routingYaw)) {
-                        executor.startLegacyAntiStuckPulse(config);
-                        return;
-                    }
+                    changeLaneDirection = null;
                     executor.setRouteState(MovementMacroExecutor.LegacyRouteState.SWITCHING_LANE);
                     executor.setLegacyWalkingDirection(client, routingYaw);
                     return;
                 }
                 if (walkability.left()) {
+                    stuckNoExitTicks = 0;
                     executor.setRouteState(MovementMacroExecutor.LegacyRouteState.LEFT);
                 } else if (walkability.right()) {
+                    stuckNoExitTicks = 0;
                     executor.setRouteState(MovementMacroExecutor.LegacyRouteState.RIGHT);
+                } else if (decision == VerticalLaneStuckLogic.Decision.ANTI_STUCK_RESET) {
+                    stuckNoExitTicks = 0;
+                    changeLaneDirection = null;
+                    executor.startLegacyAntiStuckPulse(config);
+                    executor.setRouteState(MovementMacroExecutor.LegacyRouteState.NONE);
                 } else {
+                    stuckNoExitTicks++;
                     executor.setRouteState(MovementMacroExecutor.LegacyRouteState.NONE);
                 }
             }
@@ -66,10 +78,27 @@ final class VerticalLaneMacroController implements LegacyMovementController {
                     return;
                 }
                 MovementMacroExecutor.LegacyRouteState resolved = executor.resolveRouteAfterLaneSwitch(client, walkability, false);
-                if (resolved == MovementMacroExecutor.LegacyRouteState.LEFT
-                        || resolved == MovementMacroExecutor.LegacyRouteState.RIGHT) {
+                boolean resolvedSide = resolved == MovementMacroExecutor.LegacyRouteState.LEFT
+                        || resolved == MovementMacroExecutor.LegacyRouteState.RIGHT;
+                VerticalLaneStuckLogic.Decision decision = VerticalLaneStuckLogic.decideWhileSwitching(
+                        resolvedSide,
+                        walkability.front(),
+                        walkability.back(),
+                        stuckNoExitTicks
+                );
+                if (decision == VerticalLaneStuckLogic.Decision.CONTINUE_SIDE) {
+                    changeLaneDirection = null;
+                    stuckNoExitTicks = 0;
                     executor.setRouteState(resolved);
+                } else if (decision == VerticalLaneStuckLogic.Decision.ANTI_STUCK_RESET) {
+                    stuckNoExitTicks = 0;
+                    changeLaneDirection = null;
+                    executor.startLegacyAntiStuckPulse(config);
+                    executor.setRouteState(MovementMacroExecutor.LegacyRouteState.NONE);
+                } else if (!walkability.front() && !walkability.back()) {
+                    stuckNoExitTicks++;
                 } else {
+                    stuckNoExitTicks = 0;
                     executor.setRouteState(MovementMacroExecutor.LegacyRouteState.NONE);
                 }
             }
@@ -80,6 +109,7 @@ final class VerticalLaneMacroController implements LegacyMovementController {
                 int currentY = client.player.blockPosition().getY();
                 if (client.player.onGround() && Math.abs(executor.getLegacyLayerY() - currentY) > 1.5) {
                     changeLaneDirection = null;
+                    stuckNoExitTicks = 0;
                     if (config.rotateAfterDrop) {
                         float rotatedYaw = AngleUtils.closestCardinal(executor.getTargetYaw() + 180f);
                         executor.setTargetYaw(rotatedYaw);
@@ -89,13 +119,18 @@ final class VerticalLaneMacroController implements LegacyMovementController {
                     executor.setLegacyLayerY(currentY);
                     executor.setRouteState(MovementMacroExecutor.LegacyRouteState.NONE);
                 } else if (client.player.onGround()) {
+                    stuckNoExitTicks = 0;
                     executor.setLegacyLayerY(currentY);
                     executor.setRouteState(MovementMacroExecutor.LegacyRouteState.NONE);
                 } else {
                     executor.legacyScheduleNotMoving(config);
                 }
             }
-            case NONE -> executor.setRouteState(executor.calculateLegacyVerticalDirection(client));
+            case NONE -> {
+                changeLaneDirection = null;
+                stuckNoExitTicks = 0;
+                executor.setRouteState(executor.calculateLegacyVerticalDirection(client));
+            }
             default -> executor.setRouteState(MovementMacroExecutor.LegacyRouteState.NONE);
         }
     }
@@ -112,17 +147,24 @@ final class VerticalLaneMacroController implements LegacyMovementController {
         switch (state) {
             case LEFT -> {
                 boolean forward = config.alwaysHoldW || PlayerUtils.shouldWalkForwards(client);
+                // Water / slab ledge: nudge forward briefly so hops clear the edge.
+                if (!forward && (walkability.front() || executor.hasForwardWaterOrSlabHop(client, routingYaw))) {
+                    forward = true;
+                }
                 executor.holdMovement(client, config, forward, false, true, false, false, holdAttack);
                 executor.setDirectionLabel("LEFT");
             }
             case RIGHT -> {
                 boolean forward = config.alwaysHoldW || PlayerUtils.shouldWalkForwards(client);
+                if (!forward && (walkability.front() || executor.hasForwardWaterOrSlabHop(client, routingYaw))) {
+                    forward = true;
+                }
                 executor.holdMovement(client, config, forward, false, false, true, false, holdAttack);
                 executor.setDirectionLabel("RIGHT");
             }
             case SWITCHING_LANE -> {
                 if (changeLaneDirection == null) {
-                    if (walkability.front()) {
+                    if (walkability.front() || executor.hasForwardWaterOrSlabHop(client, routingYaw)) {
                         changeLaneDirection = ChangeLaneDirection.FORWARD;
                     } else if (walkability.back()) {
                         changeLaneDirection = ChangeLaneDirection.BACKWARD;

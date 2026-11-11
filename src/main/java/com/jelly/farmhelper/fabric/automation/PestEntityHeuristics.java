@@ -8,6 +8,10 @@ import java.util.Set;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
 
+/**
+ * Hypixel garden pest identification. Entity-type hints alone are never enough —
+ * ambient bats / armor stands / displays must not light ESP without pest name or texture evidence.
+ */
 public class PestEntityHeuristics {
     private static final List<String> PEST_KEYWORDS = List.of(
             "beetle", "cricket", "earthworm", "fly", "locust", "mite",
@@ -15,10 +19,16 @@ public class PestEntityHeuristics {
             "firefly", "dragonfly", "pest"
     );
     private static final List<String> NON_PEST_NAME_KEYWORDS = List.of(
-            "pesthunter", "philip", "visitor", "npc", "jacob"
+            "pesthunter", "philip", "visitor", "npc", "jacob",
+            "comparator", "repeater", "redstone", "hopper", "dropper", "dispenser"
     );
     private static final List<String> PEST_ENTITY_TYPE_KEYWORDS = List.of(
             "silverfish", "bat", "endermite", "spider", "cave_spider", "slime", "magma_cube", "armor_stand"
+    );
+    private static final List<String> HARD_REJECT_TYPE_KEYWORDS = List.of(
+            "item_frame", "glow_item_frame", "item_display", "block_display", "text_display",
+            "interaction", "marker", "experience_orb", "arrow", "firework", "painting",
+            "minecart", "boat", "llama", "villager", "wandering_trader"
     );
 
     // Legacy texture-signature fragments from the 1.8.9 implementation.
@@ -42,25 +52,55 @@ public class PestEntityHeuristics {
         if (entity == null) {
             return 0.0;
         }
-        double score = 0.0;
-        String name = normalizedName(entity);
-        String typeName = normalizedType(entity);
-        String tags = commandTags(entity);
-        String equipment = equipmentMetadata(entity);
-        if (containsAny(name, NON_PEST_NAME_KEYWORDS)) {
+        return scoreSignals(
+                normalizedName(entity),
+                normalizedType(entity),
+                commandTags(entity),
+                equipmentMetadata(entity),
+                entity.hasCustomName(),
+                entity.isInvisible()
+        );
+    }
+
+    /**
+     * Pure scoring for unit tests (no Minecraft entity required).
+     */
+    public double scoreSignals(
+            String name,
+            String typeName,
+            String tags,
+            String equipment,
+            boolean hasCustomName,
+            boolean invisible
+    ) {
+        String n = nullToEmpty(name);
+        String t = nullToEmpty(typeName);
+        String tg = nullToEmpty(tags);
+        String eq = nullToEmpty(equipment);
+
+        if (containsAny(n, NON_PEST_NAME_KEYWORDS) || containsAny(eq, NON_PEST_NAME_KEYWORDS)) {
             return 0.0;
         }
-        boolean nameHasKeyword = containsAny(name, PEST_KEYWORDS);
-        boolean typeMatches = containsAny(typeName, PEST_ENTITY_TYPE_KEYWORDS);
-        boolean tagsMatch = containsAny(tags, PEST_KEYWORDS);
-        boolean equipmentHasKeyword = containsAny(equipment, PEST_KEYWORDS);
-        boolean textureSignature = containsAny(equipment, TEXTURE_SIGNATURES);
+        if (containsAny(t, HARD_REJECT_TYPE_KEYWORDS)) {
+            return 0.0;
+        }
 
+        boolean nameHasKeyword = containsAny(n, PEST_KEYWORDS);
+        boolean typeMatches = containsAny(t, PEST_ENTITY_TYPE_KEYWORDS);
+        boolean tagsMatch = containsAny(tg, PEST_KEYWORDS);
+        boolean equipmentHasKeyword = containsAny(eq, PEST_KEYWORDS);
+        boolean textureSignature = containsAny(eq, TEXTURE_SIGNATURES);
+        boolean strongEvidence = nameHasKeyword || textureSignature || equipmentHasKeyword;
+
+        double score = 0.0;
         if (nameHasKeyword) {
             score += 8.0;
         }
-        if (typeMatches) {
+        // Type is only a supporting signal once pest evidence exists.
+        if (typeMatches && strongEvidence) {
             score += 7.5;
+        } else if (typeMatches) {
+            score += 1.0;
         }
         if (tagsMatch) {
             score += 3.5;
@@ -71,23 +111,59 @@ public class PestEntityHeuristics {
         if (textureSignature) {
             score += 12.0;
         }
-        if (entity.hasCustomName()) {
+        if (hasCustomName && strongEvidence) {
             score += 1.0;
         }
-        if (entity.isInvisible()) {
+        if (invisible && strongEvidence) {
             score += 0.6;
         }
 
-        // Armor stands are common false positives unless we have strong evidence.
-        if (typeName.contains("armor_stand") && !textureSignature && !equipmentHasKeyword && !nameHasKeyword) {
-            score -= 4.0;
+        if (t.contains("armor_stand") && !textureSignature && !equipmentHasKeyword && !nameHasKeyword) {
+            score = 0.0;
         }
 
         return score;
     }
 
     public boolean isLikelyPest(Entity entity) {
-        return score(entity) >= 8.0;
+        if (entity == null) {
+            return false;
+        }
+        return isLikelyPestSignals(
+                normalizedName(entity),
+                normalizedType(entity),
+                commandTags(entity),
+                equipmentMetadata(entity),
+                entity.hasCustomName(),
+                entity.isInvisible()
+        );
+    }
+
+    public boolean isLikelyPestSignals(
+            String name,
+            String typeName,
+            String tags,
+            String equipment,
+            boolean hasCustomName,
+            boolean invisible
+    ) {
+        String n = nullToEmpty(name);
+        String t = nullToEmpty(typeName);
+        String eq = nullToEmpty(equipment);
+        if (containsAny(n, NON_PEST_NAME_KEYWORDS) || containsAny(eq, NON_PEST_NAME_KEYWORDS)) {
+            return false;
+        }
+        if (containsAny(t, HARD_REJECT_TYPE_KEYWORDS)) {
+            return false;
+        }
+        boolean nameHasKeyword = containsAny(n, PEST_KEYWORDS);
+        boolean textureSignature = containsAny(eq, TEXTURE_SIGNATURES);
+        boolean equipmentHasKeyword = containsAny(eq, PEST_KEYWORDS);
+        // Ambient bats / bare silverfish / etc. never pass without pest evidence.
+        if (!nameHasKeyword && !textureSignature && !equipmentHasKeyword) {
+            return false;
+        }
+        return scoreSignals(name, typeName, tags, equipment, hasCustomName, invisible) >= 8.0;
     }
 
     public boolean isConfirmedPest(Entity entity) {
@@ -98,7 +174,10 @@ public class PestEntityHeuristics {
         String typeName = normalizedType(entity);
         String tags = commandTags(entity);
         String equipment = equipmentMetadata(entity);
-        if (containsAny(name, NON_PEST_NAME_KEYWORDS)) {
+        if (containsAny(name, NON_PEST_NAME_KEYWORDS) || containsAny(equipment, NON_PEST_NAME_KEYWORDS)) {
+            return false;
+        }
+        if (containsAny(typeName, HARD_REJECT_TYPE_KEYWORDS)) {
             return false;
         }
         boolean nameHasKeyword = containsAny(name, PEST_KEYWORDS);
@@ -115,6 +194,10 @@ public class PestEntityHeuristics {
         return (nameHasKeyword || equipmentHasKeyword) && tagsMatch;
     }
 
+    private static String nullToEmpty(String value) {
+        return value == null ? "" : value.toLowerCase(Locale.ROOT);
+    }
+
     private boolean containsAny(String haystack, List<String> needles) {
         if (haystack == null || haystack.isBlank()) {
             return false;
@@ -129,7 +212,7 @@ public class PestEntityHeuristics {
 
     private String commandTags(Entity entity) {
         try {
-            Set<String> tags = java.util.Collections.emptySet(); // entity scoreboard tags API changed in 26.3
+            Set<String> tags = java.util.Collections.emptySet();
             return String.join(" ", tags).toLowerCase(Locale.ROOT);
         } catch (Throwable ignored) {
             return "";

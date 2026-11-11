@@ -252,7 +252,7 @@ public class PestsDestroyerFeatureModule extends MacroExclusiveFeatureModule {
                             preferredSlot = config.pestFarmerBiohazardSlot;
                         }
                         queueCommand("/wardrobe", runtime.tickCount);
-                        queueWaitForScreen("wardrobe", 90L, 2, runtime.tickCount);
+                        queueWaitForScreen("wardrobe", 90L, Math.max(3, config.pestsDestroyerRetryLimit), runtime.tickCount);
                         queueClickSlotMatching("name:" + preferredSlot, 70L, 2, runtime.tickCount);
                         queueCloseScreen(runtime.tickCount);
                     }

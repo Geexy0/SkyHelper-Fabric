@@ -16,6 +16,7 @@ import com.jelly.farmhelper.fabric.hud.DebugHudRenderer;
 import com.jelly.farmhelper.fabric.hud.FailsafeBannerRenderer;
 import com.jelly.farmhelper.fabric.hud.ProfitHudRenderer;
 import com.jelly.farmhelper.fabric.hud.StatusHudRenderer;
+import com.jelly.farmhelper.fabric.macro.LegacyMacroType;
 import com.jelly.farmhelper.fabric.macro.MovementMacroExecutor;
 import com.jelly.farmhelper.fabric.runtime.ClientActionQueue;
 import com.jelly.farmhelper.fabric.runtime.RuntimeSnapshot;
@@ -30,6 +31,7 @@ import com.jelly.farmhelper.fabric.util.DesktopNotifier;
 import com.jelly.farmhelper.fabric.util.FailsafeUtils;
 import com.jelly.farmhelper.fabric.util.InventoryUtils;
 import com.jelly.farmhelper.fabric.util.KeyBindUtils;
+import com.jelly.farmhelper.fabric.util.KeybindSanitizer;
 import com.jelly.farmhelper.fabric.util.PlotUtils;
 import com.jelly.farmhelper.fabric.util.PlayerUtils;
 import com.jelly.farmhelper.fabric.util.RenderUtils;
@@ -81,8 +83,6 @@ import java.util.regex.Pattern;
 
 public class FarmHelperFabricClient implements ClientModInitializer {
     private static final long KEYBIND_DEBOUNCE_TICKS = 4L;
-    private static final int SDL_NUM_SCANCODES = 512;
-    private static final Pattern NUMERIC_KEYBOARD_NAME = Pattern.compile("^key\\.keyboard\\.-?\\d+$");
     private static final Pattern INFESTED_PLOT_PATTERN = Pattern.compile("plot\\s*(\\d+).*?(\\d+)\\s*pests?", Pattern.CASE_INSENSITIVE);
     private static final Pattern GUI_PLOT_PATTERN = Pattern.compile("plot\\s*(\\d+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern GUI_PEST_PATTERN = Pattern.compile("(\\d+)\\D*?pests?", Pattern.CASE_INSENSITIVE);
@@ -127,6 +127,8 @@ public class FarmHelperFabricClient implements ClientModInitializer {
     private long lastAutoPestsRewarpCheckTick = -400L;
     private long worldJoinTick = -1L;
     private boolean postJoinAligned;
+    private boolean pendingPostWarpRealign;
+    private long postWarpRealignAfterTick = -1L;
     private boolean wasNearRewarpPoint;
     private RewarpPoint pendingRewarpPoint;
     private long pendingRewarpReadyTick = -1L;
@@ -267,6 +269,8 @@ public class FarmHelperFabricClient implements ClientModInitializer {
             }
             worldJoinTick = -1L;
             postJoinAligned = false;
+            pendingPostWarpRealign = false;
+            postWarpRealignAfterTick = -1L;
             wasNearRewarpPoint = false;
             clearPendingRewarp();
             reconnectCooldownUntilTick = tickCounter + 20L;
@@ -275,6 +279,7 @@ public class FarmHelperFabricClient implements ClientModInitializer {
             FarmHelperFabric.getFailsafeManager().onWorldChange();
             worldJoinTick = tickCounter;
             postJoinAligned = false;
+            schedulePostWarpRealign(18L);
             wasNearRewarpPoint = false;
             clearPendingRewarp();
             reconnectAttempts = 0;
@@ -530,11 +535,7 @@ public class FarmHelperFabricClient implements ClientModInitializer {
     }
 
     private static int sanitizeKeyCode(int stored, int fallback) {
-        // SDL keyboard ByteBuffer is sized to SDL_NUM_SCANCODES (512).
-        if (stored < 0 || stored >= SDL_NUM_SCANCODES) {
-            return fallback;
-        }
-        return stored;
+        return KeybindSanitizer.sanitizeKeyCode(stored, fallback);
     }
 
     private void sanitizeFarmHelperKeybinds(Minecraft client) {
@@ -576,15 +577,14 @@ public class FarmHelperFabricClient implements ClientModInitializer {
     }
 
     private static boolean isCorruptKeyboardBinding(InputConstants.Key key) {
-        if (key == null || key.getType() != InputConstants.Type.KEYBOARD) {
+        if (key == null) {
             return false;
         }
-        int value = key.getValue();
-        if (value < 0 || value >= SDL_NUM_SCANCODES) {
-            return true;
-        }
-        String name = key.getName();
-        return name != null && NUMERIC_KEYBOARD_NAME.matcher(name).matches();
+        return KeybindSanitizer.isCorruptKeyboardBinding(
+                key.getValue(),
+                key.getName(),
+                key.getType() == InputConstants.Type.KEYBOARD
+        );
     }
 
     private boolean consumeDebounced(KeyMapping key, long lastAcceptedTick) {
@@ -1476,6 +1476,7 @@ public class FarmHelperFabricClient implements ClientModInitializer {
                 clearPendingRewarp();
                 FarmHelperFabric.getFailsafeManager().suppressPacketChecks(140L, 100L, 40L, "rewarp point warp");
                 FarmHelperFabric.getClientActionQueue().enqueueCommand("/warp garden", tickCounter);
+                schedulePostWarpRealign(28L);
                 FarmHelperFabric.getWebhookService().debugTrace(
                         "macro",
                         "rewarp triggered at "
@@ -1503,17 +1504,52 @@ public class FarmHelperFabricClient implements ClientModInitializer {
         }
 
         if (!postJoinAligned && config.rotateAfterWarped && worldJoinTick > 0 && tickCounter - worldJoinTick <= 80L) {
-            if (Math.abs(config.spawnYaw) > 0.01f || Math.abs(config.spawnPitch) > 0.01f) {
-                RotationHandler.RotationConfiguration.Builder builder = new RotationHandler.RotationConfiguration.Builder()
-                        .target(config.spawnYaw, config.spawnPitch)
-                        .durationMs(Math.max(180L, config.rotationTimeMs))
-                        .easing(RotationHandler.Easing.EASE_OUT_CUBIC)
-                        .type(RotationHandler.RotationType.CLIENT)
-                        .lockHeadToBody(false);
-                ROTATION_HANDLER.rotate(builder.build());
-            }
+            applyPostWarpCamera(client, config);
             postJoinAligned = true;
         }
+
+        if (pendingPostWarpRealign && tickCounter >= postWarpRealignAfterTick) {
+            pendingPostWarpRealign = false;
+            postWarpRealignAfterTick = -1L;
+            applyPostWarpCamera(client, config);
+            MOVEMENT_MACRO_EXECUTOR.realignCameraAfterWarp(client, config);
+        }
+    }
+
+    private void schedulePostWarpRealign(long delayTicks) {
+        pendingPostWarpRealign = true;
+        postWarpRealignAfterTick = tickCounter + Math.max(8L, delayTicks);
+    }
+
+    private void applyPostWarpCamera(Minecraft client, FarmHelperConfig config) {
+        if (client == null || client.player == null || config == null || !config.rotateAfterWarped) {
+            return;
+        }
+        float yaw = config.customYaw ? config.customYawLevel : config.spawnYaw;
+        float pitch = config.customPitch ? config.customPitchLevel : config.spawnPitch;
+        LegacyMacroType macroType = config.macroType == null ? LegacyMacroType.S_V_NORMAL_TYPE : config.macroType;
+        if (macroType.locksCameraLikeWheat()) {
+            if (!config.customYaw) {
+                yaw = -90f;
+            }
+            if (!config.customPitch) {
+                pitch = 0f;
+            }
+        } else if (macroType == LegacyMacroType.S_NETHER_WART && !config.customPitch) {
+            pitch = 3.0f;
+        }
+        if (Math.abs(yaw) < 0.01f && Math.abs(pitch) < 0.01f
+                && !macroType.locksCameraLikeWheat()
+                && macroType != LegacyMacroType.S_NETHER_WART) {
+            return;
+        }
+        RotationHandler.RotationConfiguration.Builder builder = new RotationHandler.RotationConfiguration.Builder()
+                .target(yaw, pitch)
+                .durationMs(Math.max(180L, config.rotationTimeMs))
+                .easing(RotationHandler.Easing.EASE_OUT_CUBIC)
+                .type(RotationHandler.RotationType.CLIENT)
+                .lockHeadToBody(false);
+        ROTATION_HANDLER.rotate(builder.build());
     }
 
     private boolean isNearConfiguredSpawn(Minecraft client, FarmHelperConfig config) {

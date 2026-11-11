@@ -349,7 +349,7 @@ public class MovementMacroExecutor {
         OrientationSnapshot orientationSnapshot = analyzeOrientationSnapshot(client, config, fallbackBaseYaw);
         lastOrientationSnapshot = orientationSnapshot;
         float legacyDefaultYaw = switch (activeType) {
-            case S_WHEAT -> -90f;
+            case S_WHEAT, S_POTATO, S_CARROT -> -90f;
             case S_PUMPKIN_MELON_DEFAULT_PLOT,
                     S_SUGAR_CANE,
                     S_MUSHROOM,
@@ -368,8 +368,8 @@ public class MovementMacroExecutor {
         targetPitch = config.customPitch
                 ? config.customPitchLevel
                 : switch (activeType) {
-            case S_WHEAT -> 0f;
-            case S_V_NORMAL_TYPE -> (float) (2.8 + ThreadLocalRandom.current().nextDouble(0.0, 0.5));
+            case S_WHEAT, S_POTATO, S_CARROT -> 0f;
+            case S_NETHER_WART, S_V_NORMAL_TYPE -> (float) (2.8 + ThreadLocalRandom.current().nextDouble(0.0, 0.5));
             case S_PUMPKIN_MELON -> (float) (28.0 + ThreadLocalRandom.current().nextDouble(0.0, 2.0));
             case S_PUMPKIN_MELON_MELONGKINGDE -> (float) (-59.2 + ThreadLocalRandom.current().nextDouble(0.0, 1.0));
             case S_CACTUS -> (float) ThreadLocalRandom.current().nextDouble(0.0, 0.5);
@@ -534,6 +534,9 @@ public class MovementMacroExecutor {
         return switch (type) {
             case S_V_NORMAL_TYPE,
                     S_WHEAT,
+                    S_POTATO,
+                    S_CARROT,
+                    S_NETHER_WART,
                     S_PUMPKIN_MELON,
                     S_PUMPKIN_MELON_MELONGKINGDE,
                     S_CACTUS,
@@ -1597,7 +1600,60 @@ public class MovementMacroExecutor {
         if (isVoidColumn(client, feet)) {
             return false;
         }
-        return isPassable(client, feet) && isPassable(client, feet.above());
+        if (isPassable(client, feet) && isPassable(client, feet.above())) {
+            return true;
+        }
+        // One-block step-up (slab / short ledge) used by vertical S-lanes at row ends.
+        BlockPos step = feet.above();
+        return isPassable(client, step) && isPassable(client, step.above()) && !isVoidColumn(client, step);
+    }
+
+    boolean hasForwardWaterOrSlabHop(Minecraft client, float yawRef) {
+        if (client == null || client.level == null) {
+            return false;
+        }
+        if (isWaterRelativeAtYaw(client, 0, 0, 1, yawRef) || isWaterRelativeAtYaw(client, 0, -1, 1, yawRef)) {
+            return true;
+        }
+        BlockState forwardFeet = getRelativeBlockStateAtYaw(client, 0, 0, 1, yawRef);
+        if (forwardFeet == null) {
+            return false;
+        }
+        String key = forwardFeet.getBlock().getDescriptionId().toLowerCase(Locale.ROOT);
+        if (key.contains("slab") || key.contains("stairs") || key.contains("carpet")) {
+            return true;
+        }
+        // Passable water/air gap with solid one below counts as a hop candidate.
+        return isWalkableOffset(client, 0, -1, 1, yawRef) || isWalkableOffset(client, 0, 1, 1, yawRef);
+    }
+
+    /**
+     * Re-apply preset / custom camera after garden warp so S_WHEAT and locked-camera types keep yaw/pitch.
+     */
+    public void realignCameraAfterWarp(Minecraft client, FarmHelperConfig config) {
+        if (client == null || client.player == null || config == null || !initialized) {
+            return;
+        }
+        float yaw = config.customYaw ? config.customYawLevel : targetYaw;
+        float pitch = config.customPitch ? config.customPitchLevel : targetPitch;
+        if (activeType != null && activeType.locksCameraLikeWheat()) {
+            if (!config.customYaw) {
+                yaw = -90f;
+            }
+            if (!config.customPitch) {
+                pitch = 0f;
+            }
+        } else if (activeType == LegacyMacroType.S_NETHER_WART && !config.customPitch) {
+            pitch = 3.0f;
+        }
+        targetYaw = yaw;
+        targetPitch = pitch;
+        if (config.customYaw || (activeType != null && activeType.locksCameraLikeWheat())) {
+            laneReferenceYaw = closestCardinal(yaw);
+            laneReferenceYawResolved = true;
+        }
+        setRouteState(LegacyRouteState.NONE);
+        directionLabel = "POST_WARP_ALIGN";
     }
 
     boolean hasWallAtYaw(Minecraft client, int lateral, int forward, float yawRef) {
@@ -2172,6 +2228,9 @@ public class MovementMacroExecutor {
             calculated = calculateLegacyMelonDefaultDirection(client);
         } else if (activeType == LegacyMacroType.S_V_NORMAL_TYPE
                 || activeType == LegacyMacroType.S_WHEAT
+                || activeType == LegacyMacroType.S_POTATO
+                || activeType == LegacyMacroType.S_CARROT
+                || activeType == LegacyMacroType.S_NETHER_WART
                 || activeType == LegacyMacroType.S_PUMPKIN_MELON
                 || activeType == LegacyMacroType.S_PUMPKIN_MELON_MELONGKINGDE
                 || activeType == LegacyMacroType.S_CACTUS
@@ -2924,6 +2983,18 @@ public class MovementMacroExecutor {
                 }
                 case S_CACTUS, S_CACTUS_SUNTZU -> {
                     if (itemId.contains("CACTUS_KNIFE")) score += 180;
+                }
+                case S_WHEAT -> {
+                    if (itemId.contains("HOE_WHEAT")) score += 180;
+                }
+                case S_POTATO -> {
+                    if (itemId.contains("HOE_POTATO")) score += 180;
+                }
+                case S_CARROT -> {
+                    if (itemId.contains("HOE_CARROT")) score += 180;
+                }
+                case S_NETHER_WART -> {
+                    if (itemId.contains("HOE_WARTS") || itemId.contains("HOE_WART")) score += 180;
                 }
                 default -> {
                     if (itemId.contains("HOE_WHEAT")

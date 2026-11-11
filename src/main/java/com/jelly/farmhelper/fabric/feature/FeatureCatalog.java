@@ -19,7 +19,6 @@ public final class FeatureCatalog {
             new FeatureDefinition("auto_sprayonator", "Auto Sprayonator"),
             new FeatureDefinition("auto_wardrobe", "Auto Wardrobe"),
             new FeatureDefinition("bps_tracker", "BPS Tracker"),
-            new FeatureDefinition("ban_info_ws", "Ban Info Analytics"),
             new FeatureDefinition("desync_checker", "Desync Checker"),
             new FeatureDefinition("freelook", "Freelook"),
             new FeatureDefinition("lag_detector", "Lag Detector"),

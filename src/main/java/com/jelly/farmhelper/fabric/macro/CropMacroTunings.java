@@ -11,6 +11,12 @@ public final class CropMacroTunings {
                 new CropMacroTuning(CropMacroMotionMode.LANE_STRAFE, CropYawMode.CARDINAL, 2.8f, 3.3f, 0));
         TUNINGS.put(LegacyMacroType.S_WHEAT,
                 new CropMacroTuning(CropMacroMotionMode.LANE_STRAFE, CropYawMode.CARDINAL, 0.0f, 0.0f, 0));
+        TUNINGS.put(LegacyMacroType.S_POTATO,
+                new CropMacroTuning(CropMacroMotionMode.LANE_STRAFE, CropYawMode.CARDINAL, 0.0f, 0.0f, 0));
+        TUNINGS.put(LegacyMacroType.S_CARROT,
+                new CropMacroTuning(CropMacroMotionMode.LANE_STRAFE, CropYawMode.CARDINAL, 0.0f, 0.0f, 0));
+        TUNINGS.put(LegacyMacroType.S_NETHER_WART,
+                new CropMacroTuning(CropMacroMotionMode.LANE_STRAFE, CropYawMode.CARDINAL, 2.8f, 3.3f, 0));
         TUNINGS.put(LegacyMacroType.S_PUMPKIN_MELON,
                 new CropMacroTuning(CropMacroMotionMode.LANE_STRAFE, CropYawMode.CARDINAL, 28.0f, 30.0f, 0));
         TUNINGS.put(LegacyMacroType.S_PUMPKIN_MELON_MELONGKINGDE,

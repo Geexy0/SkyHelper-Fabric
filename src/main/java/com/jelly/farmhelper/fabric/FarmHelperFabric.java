@@ -5,7 +5,7 @@ import com.jelly.farmhelper.fabric.event.FarmEventBus;
 import com.jelly.farmhelper.fabric.failsafe.FailsafeManager;
 import com.jelly.farmhelper.fabric.feature.FeatureManager;
 import com.jelly.farmhelper.fabric.macro.MacroController;
-import com.jelly.farmhelper.fabric.notification.DiscordWebhookService;
+import com.jelly.farmhelper.fabric.notification.LocalDebugLogService;
 import com.jelly.farmhelper.fabric.runtime.ClientActionQueue;
 import net.fabricmc.api.ModInitializer;
 import org.slf4j.Logger;
@@ -19,7 +19,7 @@ public class FarmHelperFabric implements ModInitializer {
     private static final FeatureManager FEATURE_MANAGER = new FeatureManager();
     private static final FailsafeManager FAILSAFE_MANAGER = new FailsafeManager();
     private static final MacroController MACRO_CONTROLLER = new MacroController();
-    private static final DiscordWebhookService WEBHOOK_SERVICE = new DiscordWebhookService();
+    private static final LocalDebugLogService DEBUG_LOG_SERVICE = new LocalDebugLogService();
     private static final ClientActionQueue CLIENT_ACTION_QUEUE = new ClientActionQueue();
     private static final FarmEventBus EVENT_BUS = new FarmEventBus();
 
@@ -46,8 +46,16 @@ public class FarmHelperFabric implements ModInitializer {
         return MACRO_CONTROLLER;
     }
 
-    public static DiscordWebhookService getWebhookService() {
-        return WEBHOOK_SERVICE;
+    public static LocalDebugLogService getDebugLogService() {
+        return DEBUG_LOG_SERVICE;
+    }
+
+    /**
+     * @deprecated Use {@link #getDebugLogService()}.
+     */
+    @Deprecated
+    public static LocalDebugLogService getWebhookService() {
+        return DEBUG_LOG_SERVICE;
     }
 
     public static ClientActionQueue getClientActionQueue() {

@@ -1,6 +1,6 @@
 package com.jelly.farmhelper.fabric.ui.framework;
 
-import com.mojang.blaze3d.platform.InputConstants;
+import com.jelly.farmhelper.fabric.util.KeybindSanitizer;
 import net.minecraft.client.input.MouseButtonEvent;
 
 /**
@@ -11,6 +11,10 @@ public final class UiInput {
     }
 
     public static boolean isPrimaryClick(MouseButtonEvent click) {
-        return click != null && click.button() == InputConstants.MOUSE_BUTTON_LEFT;
+        return click != null && isPrimaryClickButton(click.button());
+    }
+
+    public static boolean isPrimaryClickButton(int button) {
+        return KeybindSanitizer.isPrimaryClickButton(button);
     }
 }

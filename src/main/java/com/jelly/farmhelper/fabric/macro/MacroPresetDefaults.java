@@ -22,11 +22,22 @@ public final class MacroPresetDefaults {
             config.macroPattern = type.defaultPattern();
         }
 
-        if (type == LegacyMacroType.S_WHEAT) {
+        if (type.locksCameraLikeWheat()) {
             config.customYaw = true;
             config.customYawLevel = -90f;
             config.customPitch = true;
             config.customPitchLevel = 0f;
+            return;
+        }
+
+        if (type == LegacyMacroType.S_NETHER_WART) {
+            config.macroPattern = MacroPattern.S_SHAPE;
+            config.customPitch = true;
+            config.customPitchLevel = 3.0f;
+            // Leave yaw unlocked so the lane can keep the current cardinal after warp.
+            if (!config.customYaw) {
+                config.customYawLevel = 0f;
+            }
         }
     }
 }

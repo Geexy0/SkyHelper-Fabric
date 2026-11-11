@@ -92,10 +92,10 @@ public final class FarmHelperClientCommands {
                                                 config.macroType = type;
                                                 MacroPresetDefaults.applyOnSelect(config, type);
                                                 FarmHelperFabric.getConfigManager().save();
-                                                Chat.info("Macro type set to " + type.name()
-                                                        + (type == LegacyMacroType.S_WHEAT
+                                                String cameraNote = type.locksCameraLikeWheat()
                                                         ? " (yaw -90, pitch 0)"
-                                                        : ""));
+                                                        : (type == LegacyMacroType.S_NETHER_WART ? " (pitch ~3.0)" : "");
+                                                Chat.info("Macro type set to " + type.name() + cameraNote);
                                             } catch (IllegalArgumentException ex) {
                                                 Chat.info("Unknown macro type: " + typeText);
                                             }

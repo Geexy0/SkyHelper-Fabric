@@ -27,6 +27,7 @@ import java.util.function.Function;
 import java.util.function.IntConsumer;
 import java.util.function.IntSupplier;
 import java.util.function.Supplier;
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -42,20 +43,51 @@ public class FarmHelperModernConfigScreen extends FHScreen {
     private static final String[] VISITOR_ACTION_LABELS = {"Accept", "Accept if profitable only", "Decline", "Ignore"};
 
     private final List<SettingRow> allRows = new ArrayList<>();
+    private final List<UiButton> farmingSubNavButtons = new ArrayList<>();
     private UiScrollContainer scrollContainer;
     private UiTextField searchField;
+    private UiComponent soonPanel;
+    private GameAspect activeAspect = GameAspect.FARMING;
     private SettingSection activeSection = SettingSection.QUICK_SETUP;
     private LayoutMetrics layoutMetrics = LayoutMetrics.forScreen(1280, 720);
 
+    private enum GameAspect {
+        FARMING("Farming", "Garden macros, pests, visitors, and farm automation.", true),
+        MINING("Mining", "Coming soon — mining helpers will land here.", false),
+        FORAGING("Foraging", "Coming soon — foraging helpers will land here.", false);
+
+        private final String label;
+        private final String description;
+        private final boolean available;
+
+        GameAspect(String label, String description, boolean available) {
+            this.label = label;
+            this.description = description;
+            this.available = available;
+        }
+
+        public String label() {
+            return label;
+        }
+
+        public String description() {
+            return description;
+        }
+
+        public boolean available() {
+            return available;
+        }
+    }
+
     private enum SettingSection {
         QUICK_SETUP("Quick Setup", "Spawn, rewarp, crop profile, and the switches needed to start a farm."),
-        MACRO("Movement", "Lane movement, rotation, row timings, and macro-specific tuning."),
+        MACRO("Macro", "Lane movement, rotation, row timings, and macro-specific tuning."),
+        PESTS("Pests", "Pest destroyer, pest farmer, tracers, and aim behavior."),
+        VISITORS("Visitors", "Visitor filtering, reward rules, spending limits, and compactor handling."),
         FAILSAFES("Failsafes", "Detection thresholds, alerts, and recovery behavior."),
         AUTOMATION("Automation", "Scheduler, trading, upkeep, consumables, and helper flows."),
-        VISITORS("Visitors", "Visitor filtering, reward rules, spending limits, and compactor handling."),
-        PESTS("Pests", "Pest destroyer, pest farmer, and aim behavior."),
         ADVANCED("Advanced", "HUD, proxy, keybinds, and direct feature module toggles."),
-        DASHBOARD("All", "Every setting in one searchable list.");
+        DASHBOARD("All", "Every farming setting in one searchable list.");
 
         private final String label;
         private final String description;
@@ -98,12 +130,15 @@ public class FarmHelperModernConfigScreen extends FHScreen {
                 if (client != null && client.font != null) {
                     context.text(client.font, Component.literal("FarmHelper"), layout.left + layout.headerInset, layout.top + 16, theme.textPrimary, true);
                     if (layout.showSidebarSubtitle) {
-                        context.text(client.font, Component.literal("Modern Control Panel"), layout.left + layout.headerInset, layout.top + 32, theme.textSecondary, true);
+                        context.text(client.font, Component.literal("Game Aspects"), layout.left + layout.headerInset, layout.top + 32, theme.textSecondary, true);
                     }
-                    String sectionLabel = client.font.plainSubstrByWidth(activeSection.label(), Math.max(120, layout.contentWidth - 12));
-                    context.text(client.font, Component.literal(sectionLabel), layout.contentLeft, layout.top + 16, theme.textPrimary, true);
-                    String sectionDescription = client.font.plainSubstrByWidth(activeSection.description(), Math.max(120, layout.contentWidth - 12));
-                    context.text(client.font, Component.literal(sectionDescription), layout.contentLeft, layout.top + 32, theme.textSecondary, false);
+                    String aspectLabel = client.font.plainSubstrByWidth(activeAspect.label(), Math.max(120, layout.contentWidth - 12));
+                    context.text(client.font, Component.literal(aspectLabel), layout.contentLeft, layout.top + 16, theme.textPrimary, true);
+                    String aspectDescription = client.font.plainSubstrByWidth(
+                            activeAspect.available() ? activeSection.description() : activeAspect.description(),
+                            Math.max(120, layout.contentWidth - 12)
+                    );
+                    context.text(client.font, Component.literal(aspectDescription), layout.contentLeft, layout.top + 32, theme.textSecondary, false);
                 }
 
                 for (UiComponent child : children) {
@@ -119,19 +154,60 @@ public class FarmHelperModernConfigScreen extends FHScreen {
 
         UiColumn sidebar = new UiColumn(layout.sidebarGap);
         sidebar.setBounds(layout.left + layout.sidebarInset, layout.sidebarTop, layout.sidebarWidth - (layout.sidebarInset * 2), layout.sidebarHeight);
-        for (SettingSection section : SettingSection.values()) {
+        for (GameAspect aspect : GameAspect.values()) {
             sidebar.addChild(new UiButton(
-                    () -> Component.literal((activeSection == section ? "> " : "") + section.label()),
-                    () -> setActiveSection(section)
+                    () -> Component.literal(
+                            (activeAspect == aspect ? "> " : "")
+                                    + aspect.label()
+                                    + (aspect.available() ? "" : " (Soon)")
+                    ),
+                    () -> setActiveAspect(aspect)
             ));
         }
         root.addChild(sidebar);
         sidebar.layoutChildren();
 
-        searchField = new UiTextField("Search options...");
+        farmingSubNavButtons.clear();
+        int subNavX = layout.contentLeft;
+        int subNavY = layout.subNavTop;
+        int subNavHeight = layout.subNavHeight;
+        int gap = 6;
+        for (SettingSection section : SettingSection.values()) {
+            UiButton sub = new UiButton(
+                    () -> Component.literal((activeSection == section ? "> " : "") + section.label()),
+                    () -> setActiveSection(section)
+            );
+            int btnWidth = Math.max(72, Math.min(118, (layout.contentWidth - gap * (SettingSection.values().length - 1)) / SettingSection.values().length));
+            sub.setBounds(subNavX, subNavY, btnWidth, subNavHeight);
+            farmingSubNavButtons.add(sub);
+            root.addChild(sub);
+            subNavX += btnWidth + gap;
+        }
+
+        searchField = new UiTextField("Search farming options...");
         searchField.setBounds(layout.contentLeft, layout.searchTop, layout.contentWidth, layout.searchHeight);
         searchField.setListener(this::onSearchChanged);
         root.addChild(searchField);
+
+        soonPanel = new UiComponent() {
+            @Override
+            public void render(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta, UiTheme theme) {
+                if (!visible) {
+                    return;
+                }
+                Minecraft client = Minecraft.getInstance();
+                if (client == null || client.font == null) {
+                    return;
+                }
+                String title = activeAspect.label() + " — coming soon";
+                String body = activeAspect.description();
+                context.text(client.font, title, x + 8, y + 18, theme.textPrimary, true);
+                context.text(client.font, body, x + 8, y + 36, theme.textSecondary, false);
+            }
+        };
+        soonPanel.setBounds(layout.contentLeft - 4, layout.scrollTop, layout.contentWidth + 8, layout.scrollHeight);
+        soonPanel.setVisible(false);
+        root.addChild(soonPanel);
 
         scrollContainer = new UiScrollContainer();
         scrollContainer.setBounds(layout.contentLeft - 4, layout.scrollTop, layout.contentWidth + 8, layout.scrollHeight);
@@ -157,6 +233,18 @@ public class FarmHelperModernConfigScreen extends FHScreen {
                     MacroPresetDefaults.applyOnSelect(config, v);
                 },
                 LegacyMacroType::getDisplayName
+        );
+        addActionSetting(
+                SettingSection.QUICK_SETUP,
+                "Apply Preset Defaults",
+                "Set macro type camera/pattern defaults in one click (yaw/pitch + S-shape timings when legacy defaults are on).",
+                "Apply Preset",
+                () -> {
+                    LegacyMacroType type = config.macroType == null ? LegacyMacroType.S_V_NORMAL_TYPE : config.macroType;
+                    MacroPresetDefaults.applyOnSelect(config, type);
+                    FarmHelperFabric.getConfigManager().save();
+                    return true;
+                }
         );
         addEnumSetting(
                 SettingSection.QUICK_SETUP,
@@ -328,7 +416,7 @@ public class FarmHelperModernConfigScreen extends FHScreen {
         addHeader(SettingSection.FAILSAFES, "Recovery", "Reconnect, restart, and world-return behavior after alerts.");
         addToggleSetting(SettingSection.FAILSAFES, "Restart After Failsafe", "Restart macro automatically after recovery.", () -> config.restartAfterFailsafe, v -> config.restartAfterFailsafe = v);
         addIntSetting(SettingSection.FAILSAFES, "Restart Delay (min)", "Delay before restart after failsafe.", () -> config.restartAfterFailsafeDelayMinutes, v -> config.restartAfterFailsafeDelayMinutes = v, 0, 120);
-        addToggleSetting(SettingSection.FAILSAFES, "Jacob Failsafe", "Enable Jacob contest failsafe behavior.", () -> config.enableJacobFailsafe, v -> config.enableJacobFailsafe = v);
+        addToggleSetting(SettingSection.FAILSAFES, "Jacob Failsafe", "Pause the macro when a Jacob contest starts (chat detect).", () -> config.enableJacobFailsafe, v -> config.enableJacobFailsafe = v);
         addToggleSetting(SettingSection.FAILSAFES, "Always Teleport To Garden", "Force return to garden in reactions.", () -> config.alwaysTeleportToGarden, v -> config.alwaysTeleportToGarden = v);
         addToggleSetting(SettingSection.FAILSAFES, "Send Failsafe Chat Message", "Send configured chat response on failsafe.", () -> config.sendFailsafeChatMessage, v -> config.sendFailsafeChatMessage = v);
         addToggleSetting(SettingSection.FAILSAFES, "Enable Custom Failsafe Reactions", "Use custom reaction timing/messages.", () -> config.enableCustomFailsafeReactions, v -> config.enableCustomFailsafeReactions = v);
@@ -383,9 +471,9 @@ public class FarmHelperModernConfigScreen extends FHScreen {
         addVisitorActionSetting("Legendary", "Action taken when a legendary visitor arrives.", () -> config.visitorsActionLegendary, v -> config.visitorsActionLegendary = v);
         addVisitorActionSetting("Mythic", "Action taken when a mythic visitor arrives.", () -> config.visitorsActionMythic, v -> config.visitorsActionMythic = v);
         addVisitorActionSetting("Special", "Action taken when a special visitor arrives.", () -> config.visitorsActionSpecial, v -> config.visitorsActionSpecial = v);
-        addHeader(SettingSection.VISITORS, "Inventory & Logs", "Inventory edge-case handling and visitor webhook logging.");
+        addHeader(SettingSection.VISITORS, "Inventory & Logs", "Inventory edge-case handling and visitor local debug logging.");
         addToggleSetting(SettingSection.VISITORS, "Full Inventory Action Ignore", "If cakes do not fit, ignore instead of declining the visitor.", () -> config.fullInventoryAction, v -> config.fullInventoryAction = v);
-        addToggleSetting(SettingSection.VISITORS, "Send Visitors Logs", "Send visitors macro logs to webhook.", () -> config.sendVisitorsMacroLogs, v -> config.sendVisitorsMacroLogs = v);
+        addToggleSetting(SettingSection.VISITORS, "Send Visitors Logs", "Write visitors macro logs to the local debug log.", () -> config.sendVisitorsMacroLogs, v -> config.sendVisitorsMacroLogs = v);
         addHeader(SettingSection.AUTOMATION, "Consumables", "Keep buffs and consumables stocked while the macro runs.");
         addToggleSetting(SettingSection.AUTOMATION, "Auto Cookie", "Enable automatic cookie refresh.", () -> config.autoCookie, v -> {
             config.autoCookie = v;
@@ -436,7 +524,7 @@ public class FarmHelperModernConfigScreen extends FHScreen {
         addIntSetting(SettingSection.PESTS, "Pests Max Passes", "Max passes over plots per cycle.", () -> config.pestsDestroyerMaxPasses, v -> config.pestsDestroyerMaxPasses = v, 1, 20);
         addToggleSetting(SettingSection.PESTS, "Don't Teleport To Plots", "Fly from barn/spawn to the target plot instead of using /plottp.", () -> config.pestsDestroyerDontTeleportToPlots, v -> config.pestsDestroyerDontTeleportToPlots = v);
         addIntSetting(SettingSection.PESTS, "Can't Reach Ticks", "Ticks of stalled pest hunting before escape recovery. Set 0 to disable.", () -> config.pestsDestroyerCantReachTicks, v -> config.pestsDestroyerCantReachTicks = v, 0, 400);
-        addToggleSetting(SettingSection.PESTS, "Disable During Jacob", "Disable pests destroyer during Jacob contests.", () -> config.pestsDestroyerDisableDuringJacobsContest, v -> config.pestsDestroyerDisableDuringJacobsContest = v);
+        addToggleSetting(SettingSection.PESTS, "Pause pests during Jacob", "Skip / pause pests destroyer while a Jacob contest is active; resumes after contest.", () -> config.pestsDestroyerDisableDuringJacobsContest, v -> config.pestsDestroyerDisableDuringJacobsContest = v);
         addToggleSetting(SettingSection.PESTS, "Start Only On Rewarp/Spawn", "Only trigger pests run near spawn/rewarp points.", () -> config.pestsDestroyerStartOnlyOnRewarpOrSpawn, v -> config.pestsDestroyerStartOnlyOnRewarpOrSpawn = v);
         addFloatSetting(SettingSection.PESTS, "Aim Deadzone Yaw", "Yaw deadzone to reduce jitter tracking.", () -> config.pestsAimDeadzoneYaw, v -> config.pestsAimDeadzoneYaw = v, 0f, 45f);
         addFloatSetting(SettingSection.PESTS, "Aim Deadzone Pitch", "Pitch deadzone to reduce jitter tracking.", () -> config.pestsAimDeadzonePitch, v -> config.pestsAimDeadzonePitch = v, 0f, 45f);
@@ -503,18 +591,22 @@ public class FarmHelperModernConfigScreen extends FHScreen {
         addTextSetting(SettingSection.ADVANCED, "Proxy Username", "Proxy username.", () -> config.proxyUsername, v -> config.proxyUsername = v, 128);
         addTextSetting(SettingSection.ADVANCED, "Proxy Password", "Proxy password.", () -> config.proxyPassword, v -> config.proxyPassword = v, 128);
 
-        addHeader(SettingSection.ADVANCED, "Keybinds", "Direct keycode bindings for macro and utility actions.");
-        addIntSetting(SettingSection.ADVANCED, "Toggle Macro Key", "GLFW keycode for macro toggle.", () -> config.toggleMacroKey, v -> config.toggleMacroKey = v, -1, 400);
-        addIntSetting(SettingSection.ADVANCED, "Start Macro Key", "GLFW keycode for macro start.", () -> config.startMacroKey, v -> config.startMacroKey = v, -1, 400);
-        addIntSetting(SettingSection.ADVANCED, "Stop Macro Key", "GLFW keycode for macro stop.", () -> config.stopMacroKey, v -> config.stopMacroKey = v, -1, 400);
-        addIntSetting(SettingSection.ADVANCED, "Open Menu Key", "GLFW keycode for opening FarmHelper menu.", () -> config.openMenuKey, v -> config.openMenuKey = v, -1, 400);
-        addIntSetting(SettingSection.ADVANCED, "Trigger Failsafe Key", "GLFW keycode for manual failsafe test.", () -> config.triggerFailsafeKey, v -> config.triggerFailsafeKey = v, -1, 400);
-        addIntSetting(SettingSection.ADVANCED, "Freelook Key", "GLFW keycode for freelook toggle.", () -> config.freelookKey, v -> config.freelookKey = v, -1, 400);
-        addIntSetting(SettingSection.ADVANCED, "Cancel Failsafe Key", "GLFW keycode to cancel current failsafe.", () -> config.cancelFailsafeKey, v -> config.cancelFailsafeKey = v, -1, 400);
-        addIntSetting(SettingSection.ADVANCED, "Toggle Ungrab Mouse Key", "GLFW keycode for ungrab toggle.", () -> config.toggleUngrabMouseKey, v -> config.toggleUngrabMouseKey = v, -1, 400);
-        addIntSetting(SettingSection.ADVANCED, "Plot Cleaning Helper Key", "GLFW keycode for plot cleaning helper.", () -> config.plotCleaningHelperKey, v -> config.plotCleaningHelperKey = v, -1, 400);
-        addIntSetting(SettingSection.ADVANCED, "Trigger Pests Destroyer Key", "GLFW keycode for pests destroyer trigger.", () -> config.triggerPestsDestroyerKey, v -> config.triggerPestsDestroyerKey = v, -1, 400);
-        addIntSetting(SettingSection.ADVANCED, "TP To Infested Plot Key", "GLFW keycode for teleporting to infested plot.", () -> config.tpToInfestedPlotKey, v -> config.tpToInfestedPlotKey = v, -1, 400);
+        addHeader(
+                SettingSection.ADVANCED,
+                "Keybinds",
+                "Prefer Options → Controls → FarmHelper. Numeric fields below are SDL scancodes (legacy override); key names shown next to each value."
+        );
+        addKeybindSetting(SettingSection.ADVANCED, "Toggle Macro Key", "SDL scancode override for macro toggle.", () -> config.toggleMacroKey, v -> config.toggleMacroKey = v);
+        addKeybindSetting(SettingSection.ADVANCED, "Start Macro Key", "SDL scancode override for macro start.", () -> config.startMacroKey, v -> config.startMacroKey = v);
+        addKeybindSetting(SettingSection.ADVANCED, "Stop Macro Key", "SDL scancode override for macro stop.", () -> config.stopMacroKey, v -> config.stopMacroKey = v);
+        addKeybindSetting(SettingSection.ADVANCED, "Open Menu Key", "SDL scancode override for opening FarmHelper menu.", () -> config.openMenuKey, v -> config.openMenuKey = v);
+        addKeybindSetting(SettingSection.ADVANCED, "Trigger Failsafe Key", "SDL scancode override for manual failsafe test.", () -> config.triggerFailsafeKey, v -> config.triggerFailsafeKey = v);
+        addKeybindSetting(SettingSection.ADVANCED, "Freelook Key", "SDL scancode override for freelook toggle.", () -> config.freelookKey, v -> config.freelookKey = v);
+        addKeybindSetting(SettingSection.ADVANCED, "Cancel Failsafe Key", "SDL scancode override to cancel current failsafe.", () -> config.cancelFailsafeKey, v -> config.cancelFailsafeKey = v);
+        addKeybindSetting(SettingSection.ADVANCED, "Toggle Ungrab Mouse Key", "SDL scancode override for ungrab toggle.", () -> config.toggleUngrabMouseKey, v -> config.toggleUngrabMouseKey = v);
+        addKeybindSetting(SettingSection.ADVANCED, "Plot Cleaning Helper Key", "SDL scancode override for plot cleaning helper.", () -> config.plotCleaningHelperKey, v -> config.plotCleaningHelperKey = v);
+        addKeybindSetting(SettingSection.ADVANCED, "Trigger Pests Destroyer Key", "SDL scancode override for pests destroyer trigger.", () -> config.triggerPestsDestroyerKey, v -> config.triggerPestsDestroyerKey = v);
+        addKeybindSetting(SettingSection.ADVANCED, "TP To Infested Plot Key", "SDL scancode override for teleporting to infested plot.", () -> config.tpToInfestedPlotKey, v -> config.tpToInfestedPlotKey = v);
 
         addHeader(SettingSection.ADVANCED, "Feature Modules", "Direct low-level feature toggles for power users.");
         for (FeatureCatalog.FeatureDefinition definition : FeatureCatalog.DEFINITIONS) {
@@ -561,6 +653,50 @@ public class FarmHelperModernConfigScreen extends FHScreen {
             } catch (NumberFormatException ignored) {
             }
         }, 16);
+    }
+
+    private void addKeybindSetting(SettingSection section, String title, String description, IntSupplier getter, IntConsumer setter) {
+        addTextSetting(section, title, description, () -> {
+            int code = getter.getAsInt();
+            return code + " (" + formatScancodeName(code) + ")";
+        }, text -> {
+            if (text == null || text.isBlank()) {
+                return;
+            }
+            String raw = text.trim();
+            int paren = raw.indexOf('(');
+            if (paren > 0) {
+                raw = raw.substring(0, paren).trim();
+            }
+            try {
+                int value = Integer.parseInt(raw);
+                value = Math.max(-1, Math.min(511, value));
+                setter.accept(value);
+            } catch (NumberFormatException ignored) {
+            }
+        }, 48);
+    }
+
+    private static String formatScancodeName(int scancode) {
+        if (scancode < 0) {
+            return "unset";
+        }
+        if (scancode == 0) {
+            return "none";
+        }
+        try {
+            InputConstants.Key key = InputConstants.Type.KEYBOARD.getOrCreate(scancode);
+            Component display = key.getDisplayName();
+            if (display != null) {
+                String name = display.getString();
+                if (name != null && !name.isBlank()) {
+                    return name;
+                }
+            }
+            return key.getName();
+        } catch (RuntimeException ignored) {
+            return "scancode " + scancode;
+        }
     }
 
     private void addFloatSetting(SettingSection section, String title, String description, Supplier<Float> getter, Consumer<Float> setter, float min, float max) {
@@ -616,12 +752,29 @@ public class FarmHelperModernConfigScreen extends FHScreen {
         applyFiltersAndLayout();
     }
 
+    private void setActiveAspect(GameAspect aspect) {
+        if (aspect == null) {
+            return;
+        }
+        activeAspect = aspect;
+        if (aspect.available() && activeSection == null) {
+            activeSection = SettingSection.QUICK_SETUP;
+        }
+        if (scrollContainer != null) {
+            scrollContainer.scrollToTop();
+        }
+        applyFiltersAndLayout();
+    }
+
     private void setActiveSection(SettingSection section) {
         if (section == null) {
             return;
         }
+        activeAspect = GameAspect.FARMING;
         activeSection = section;
-        scrollContainer.scrollToTop();
+        if (scrollContainer != null) {
+            scrollContainer.scrollToTop();
+        }
         applyFiltersAndLayout();
     }
 
@@ -630,6 +783,28 @@ public class FarmHelperModernConfigScreen extends FHScreen {
             return;
         }
         LayoutMetrics layout = layoutMetrics == null ? LayoutMetrics.forScreen(width, height) : layoutMetrics;
+        boolean farming = activeAspect == GameAspect.FARMING;
+
+        for (UiButton sub : farmingSubNavButtons) {
+            sub.setVisible(farming);
+            sub.setEnabled(farming);
+        }
+        if (searchField != null) {
+            searchField.setVisible(farming);
+        }
+        if (soonPanel != null) {
+            soonPanel.setVisible(!farming);
+        }
+        scrollContainer.setVisible(farming);
+
+        if (!farming) {
+            for (SettingRow row : allRows) {
+                row.setVisible(false);
+            }
+            scrollContainer.setContentHeight(0);
+            return;
+        }
+
         String lower = searchField == null ? "" : searchField.getText().toLowerCase(Locale.ROOT).trim();
         int y = scrollContainer.getY() + 8;
         int x = scrollContainer.getX() + 8;
@@ -675,6 +850,8 @@ public class FarmHelperModernConfigScreen extends FHScreen {
         private final int headerInset;
         private final int contentLeft;
         private final int contentWidth;
+        private final int subNavTop;
+        private final int subNavHeight;
         private final int searchTop;
         private final int searchHeight;
         private final int scrollTop;
@@ -710,6 +887,8 @@ public class FarmHelperModernConfigScreen extends FHScreen {
                 int headerInset,
                 int contentLeft,
                 int contentWidth,
+                int subNavTop,
+                int subNavHeight,
                 int searchTop,
                 int searchHeight,
                 int scrollTop,
@@ -744,6 +923,8 @@ public class FarmHelperModernConfigScreen extends FHScreen {
             this.headerInset = headerInset;
             this.contentLeft = contentLeft;
             this.contentWidth = contentWidth;
+            this.subNavTop = subNavTop;
+            this.subNavHeight = subNavHeight;
             this.searchTop = searchTop;
             this.searchHeight = searchHeight;
             this.scrollTop = scrollTop;
@@ -793,10 +974,12 @@ public class FarmHelperModernConfigScreen extends FHScreen {
             int sidebarHeight = Math.max(120, panelHeight - (showSidebarSubtitle ? 84 : 66));
             int contentLeft = left + sidebarWidth + contentGap;
             int contentWidth = Math.max(minContentWidth, panelWidth - sidebarWidth - contentGap - contentRightInset);
+            int subNavHeight = veryCompact ? 22 : 24;
+            int subNavTop = top + (showSidebarSubtitle ? 52 : 48);
             int searchHeight = veryCompact ? 20 : 24;
-            int searchTop = top + (showSidebarSubtitle ? 22 : 18);
-            int scrollTop = searchTop + searchHeight + (veryCompact ? 10 : 12);
-            int scrollHeight = Math.max(120, panelHeight - (scrollTop - top) - (veryCompact ? 10 : 16));
+            int searchTop = subNavTop + subNavHeight + (veryCompact ? 8 : 10);
+            int scrollTop = searchTop + searchHeight + (veryCompact ? 8 : 10);
+            int scrollHeight = Math.max(100, panelHeight - (scrollTop - top) - (veryCompact ? 10 : 16));
 
             int headerRowHeight = veryCompact ? 50 : 56;
             int rowHeight = veryCompact ? 64 : compact ? 72 : 82;
@@ -828,6 +1011,8 @@ public class FarmHelperModernConfigScreen extends FHScreen {
                     headerInset,
                     contentLeft,
                     contentWidth,
+                    subNavTop,
+                    subNavHeight,
                     searchTop,
                     searchHeight,
                     scrollTop,

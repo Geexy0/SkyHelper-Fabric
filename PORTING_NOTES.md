@@ -12,7 +12,7 @@
 
 Removed / neutralized versus older FarmHelper builds:
 
-- Discord webhook network posting (class name `DiscordWebhookService` retained as a **local file logger** only)
+- Discord webhook network posting (`LocalDebugLogService`; deprecated alias `DiscordWebhookService`)
 - Analytics / phone-home endpoints
 - Remote-control websocket / bot integrations
 

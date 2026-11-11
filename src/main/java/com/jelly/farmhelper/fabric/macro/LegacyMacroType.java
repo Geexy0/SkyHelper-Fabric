@@ -3,6 +3,9 @@ package com.jelly.farmhelper.fabric.macro;
 public enum LegacyMacroType {
     S_V_NORMAL_TYPE("S Shape / Vertical - Crops"),
     S_WHEAT("S Shape - Wheat (Yaw -90 / Pitch 0)"),
+    S_POTATO("S Shape - Potato (Yaw -90 / Pitch 0)"),
+    S_CARROT("S Shape - Carrot (Yaw -90 / Pitch 0)"),
+    S_NETHER_WART("S Shape - Nether Wart (Pitch ~3.0)"),
     S_PUMPKIN_MELON("S Shape - Pumpkin/Melon"),
     S_PUMPKIN_MELON_MELONGKINGDE("S Shape - Pumpkin/Melon Melongkingde"),
     S_PUMPKIN_MELON_DEFAULT_PLOT("S Shape - Pumpkin/Melon Default Plot"),
@@ -32,5 +35,9 @@ public enum LegacyMacroType {
             return MacroPattern.BASIC_ROW;
         }
         return MacroPattern.S_SHAPE;
+    }
+
+    public boolean locksCameraLikeWheat() {
+        return this == S_WHEAT || this == S_POTATO || this == S_CARROT;
     }
 }
