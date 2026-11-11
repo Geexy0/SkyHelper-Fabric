@@ -1344,7 +1344,7 @@ public class FarmHelperFabricClient implements ClientModInitializer {
             if (entity == null || entity == client.player) {
                 continue;
             }
-            if (!pestHeuristics.isLikelyPest(entity)) {
+            if (!pestHeuristics.isEspPest(entity)) {
                 continue;
             }
             Vec3 pos = new Vec3(entity.getX(), entity.getY(), entity.getZ());

@@ -5,30 +5,42 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Pattern;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
 
 /**
- * Hypixel garden pest identification. Entity-type hints alone are never enough —
- * ambient bats / armor stands / displays must not light ESP without pest name or texture evidence.
+ * Hypixel garden pest identification.
+ * Ambient bats / vanilla mobs must never light ESP without an explicit pest species name or texture hash.
  */
 public class PestEntityHeuristics {
-    private static final List<String> PEST_KEYWORDS = List.of(
-            "beetle", "cricket", "earthworm", "fly", "locust", "mite",
-            "mosquito", "moth", "rat", "slug", "praying mantis",
-            "firefly", "dragonfly", "pest"
+    private static final Pattern FORMATTING = Pattern.compile("§.|(&[0-9a-fk-or])", Pattern.CASE_INSENSITIVE);
+
+    /** Full garden pest species (matched with word boundaries). */
+    private static final List<String> PEST_SPECIES = List.of(
+            "beetle", "cricket", "earthworm", "earth worm", "fly", "locust", "mite",
+            "mosquito", "moth", "rat", "slug", "praying mantis", "mantis",
+            "firefly", "dragonfly"
     );
+
     private static final List<String> NON_PEST_NAME_KEYWORDS = List.of(
             "pesthunter", "philip", "visitor", "npc", "jacob",
             "comparator", "repeater", "redstone", "hopper", "dropper", "dispenser"
     );
-    private static final List<String> PEST_ENTITY_TYPE_KEYWORDS = List.of(
-            "silverfish", "bat", "endermite", "spider", "cave_spider", "slime", "magma_cube", "armor_stand"
+
+    /** Underlying MC types Hypixel reuses for pests — never enough alone. */
+    private static final List<String> REUSED_MOB_TYPES = List.of(
+            "bat", "silverfish", "endermite", "spider", "cave_spider", "slime", "magma_cube"
     );
+
     private static final List<String> HARD_REJECT_TYPE_KEYWORDS = List.of(
             "item_frame", "glow_item_frame", "item_display", "block_display", "text_display",
             "interaction", "marker", "experience_orb", "arrow", "firework", "painting",
             "minecart", "boat", "llama", "villager", "wandering_trader"
+    );
+
+    private static final List<String> VANILLA_DISPLAY_NAMES = List.of(
+            "bat", "silverfish", "endermite", "spider", "cave spider", "slime", "magma cube", "armor stand"
     );
 
     // Legacy texture-signature fragments from the 1.8.9 implementation.
@@ -62,9 +74,6 @@ public class PestEntityHeuristics {
         );
     }
 
-    /**
-     * Pure scoring for unit tests (no Minecraft entity required).
-     */
     public double scoreSignals(
             String name,
             String typeName,
@@ -73,10 +82,10 @@ public class PestEntityHeuristics {
             boolean hasCustomName,
             boolean invisible
     ) {
-        String n = nullToEmpty(name);
-        String t = nullToEmpty(typeName);
-        String tg = nullToEmpty(tags);
-        String eq = nullToEmpty(equipment);
+        String n = clean(name);
+        String t = clean(typeName);
+        String tg = clean(tags);
+        String eq = clean(equipment);
 
         if (containsAny(n, NON_PEST_NAME_KEYWORDS) || containsAny(eq, NON_PEST_NAME_KEYWORDS)) {
             return 0.0;
@@ -84,28 +93,32 @@ public class PestEntityHeuristics {
         if (containsAny(t, HARD_REJECT_TYPE_KEYWORDS)) {
             return 0.0;
         }
+        if (isBareReusedMob(n, t) && !hasTextureSignature(eq)) {
+            return 0.0;
+        }
 
-        boolean nameHasKeyword = containsAny(n, PEST_KEYWORDS);
-        boolean typeMatches = containsAny(t, PEST_ENTITY_TYPE_KEYWORDS);
-        boolean tagsMatch = containsAny(tg, PEST_KEYWORDS);
-        boolean equipmentHasKeyword = containsAny(eq, PEST_KEYWORDS);
-        boolean textureSignature = containsAny(eq, TEXTURE_SIGNATURES);
-        boolean strongEvidence = nameHasKeyword || textureSignature || equipmentHasKeyword;
+        boolean speciesName = hasPestSpecies(n);
+        boolean speciesTags = hasPestSpecies(tg);
+        boolean speciesEquip = hasPestSpecies(eq);
+        boolean textureSignature = hasTextureSignature(eq);
+        boolean reusedType = containsAny(t, REUSED_MOB_TYPES) || t.contains("armor_stand");
+        boolean strongEvidence = speciesName || textureSignature || speciesEquip;
+
+        if (!strongEvidence) {
+            return 0.0;
+        }
 
         double score = 0.0;
-        if (nameHasKeyword) {
+        if (speciesName) {
             score += 8.0;
         }
-        // Type is only a supporting signal once pest evidence exists.
-        if (typeMatches && strongEvidence) {
+        if (reusedType && strongEvidence) {
             score += 7.5;
-        } else if (typeMatches) {
-            score += 1.0;
         }
-        if (tagsMatch) {
+        if (speciesTags) {
             score += 3.5;
         }
-        if (equipmentHasKeyword) {
+        if (speciesEquip) {
             score += 4.0;
         }
         if (textureSignature) {
@@ -117,11 +130,6 @@ public class PestEntityHeuristics {
         if (invisible && strongEvidence) {
             score += 0.6;
         }
-
-        if (t.contains("armor_stand") && !textureSignature && !equipmentHasKeyword && !nameHasKeyword) {
-            score = 0.0;
-        }
-
         return score;
     }
 
@@ -147,23 +155,41 @@ public class PestEntityHeuristics {
             boolean hasCustomName,
             boolean invisible
     ) {
-        String n = nullToEmpty(name);
-        String t = nullToEmpty(typeName);
-        String eq = nullToEmpty(equipment);
+        return scoreSignals(name, typeName, tags, equipment, hasCustomName, invisible) >= 8.0;
+    }
+
+    /**
+     * ESP-only gate: stricter than hunting heuristics. Bare bats / vanilla names never pass.
+     */
+    public boolean isEspPest(Entity entity) {
+        if (entity == null) {
+            return false;
+        }
+        return isEspPestSignals(
+                normalizedName(entity),
+                normalizedType(entity),
+                equipmentMetadata(entity)
+        );
+    }
+
+    public boolean isEspPestSignals(String name, String typeName, String equipment) {
+        String n = clean(name);
+        String t = clean(typeName);
+        String eq = clean(equipment);
         if (containsAny(n, NON_PEST_NAME_KEYWORDS) || containsAny(eq, NON_PEST_NAME_KEYWORDS)) {
             return false;
         }
         if (containsAny(t, HARD_REJECT_TYPE_KEYWORDS)) {
             return false;
         }
-        boolean nameHasKeyword = containsAny(n, PEST_KEYWORDS);
-        boolean textureSignature = containsAny(eq, TEXTURE_SIGNATURES);
-        boolean equipmentHasKeyword = containsAny(eq, PEST_KEYWORDS);
-        // Ambient bats / bare silverfish / etc. never pass without pest evidence.
-        if (!nameHasKeyword && !textureSignature && !equipmentHasKeyword) {
+        if (hasTextureSignature(eq)) {
+            return true;
+        }
+        if (isBareReusedMob(n, t)) {
             return false;
         }
-        return scoreSignals(name, typeName, tags, equipment, hasCustomName, invisible) >= 8.0;
+        // Must be an explicit pest species name (not generic "pest", not vanilla "Bat").
+        return hasPestSpecies(n);
     }
 
     public boolean isConfirmedPest(Entity entity) {
@@ -174,31 +200,87 @@ public class PestEntityHeuristics {
         String typeName = normalizedType(entity);
         String tags = commandTags(entity);
         String equipment = equipmentMetadata(entity);
-        if (containsAny(name, NON_PEST_NAME_KEYWORDS) || containsAny(equipment, NON_PEST_NAME_KEYWORDS)) {
+        String n = clean(name);
+        String t = clean(typeName);
+        String tg = clean(tags);
+        String eq = clean(equipment);
+        if (containsAny(n, NON_PEST_NAME_KEYWORDS) || containsAny(eq, NON_PEST_NAME_KEYWORDS)) {
             return false;
         }
-        if (containsAny(typeName, HARD_REJECT_TYPE_KEYWORDS)) {
+        if (containsAny(t, HARD_REJECT_TYPE_KEYWORDS)) {
             return false;
         }
-        boolean nameHasKeyword = containsAny(name, PEST_KEYWORDS);
-        boolean typeMatches = containsAny(typeName, PEST_ENTITY_TYPE_KEYWORDS);
-        boolean tagsMatch = containsAny(tags, PEST_KEYWORDS);
-        boolean equipmentHasKeyword = containsAny(equipment, PEST_KEYWORDS);
-        boolean textureSignature = containsAny(equipment, TEXTURE_SIGNATURES);
-        if (textureSignature) {
+        if (hasTextureSignature(eq)) {
             return true;
         }
-        if (nameHasKeyword && typeMatches) {
+        if (isBareReusedMob(n, t)) {
+            return false;
+        }
+        boolean speciesName = hasPestSpecies(n);
+        boolean reusedType = containsAny(t, REUSED_MOB_TYPES) || t.contains("armor_stand");
+        if (speciesName && reusedType) {
             return true;
         }
-        return (nameHasKeyword || equipmentHasKeyword) && tagsMatch;
+        return speciesName && hasPestSpecies(tg);
     }
 
-    private static String nullToEmpty(String value) {
-        return value == null ? "" : value.toLowerCase(Locale.ROOT);
+    private static boolean isBareReusedMob(String cleanedName, String cleanedType) {
+        boolean reused = containsAny(cleanedType, REUSED_MOB_TYPES);
+        if (!reused) {
+            return false;
+        }
+        if (hasPestSpecies(cleanedName)) {
+            return false;
+        }
+        // Vanilla / empty / generic labels on reused mobs are ambient false positives.
+        if (cleanedName.isBlank() || VANILLA_DISPLAY_NAMES.contains(cleanedName)) {
+            return true;
+        }
+        if (cleanedName.equals("pest") || cleanedName.startsWith("pest ")) {
+            return true;
+        }
+        // Name equals the type token (e.g. "bat", "entity.minecraft.bat").
+        for (String token : REUSED_MOB_TYPES) {
+            if (cleanedName.equals(token) || cleanedName.endsWith("." + token) || cleanedName.endsWith(" " + token)) {
+                return true;
+            }
+        }
+        return !hasPestSpecies(cleanedName);
     }
 
-    private boolean containsAny(String haystack, List<String> needles) {
+    private static boolean hasPestSpecies(String cleaned) {
+        if (cleaned == null || cleaned.isBlank()) {
+            return false;
+        }
+        for (String species : PEST_SPECIES) {
+            if (containsWord(cleaned, species)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasTextureSignature(String cleanedEquipment) {
+        return containsAny(cleanedEquipment, TEXTURE_SIGNATURES);
+    }
+
+    private static boolean containsWord(String haystack, String phrase) {
+        if (haystack == null || phrase == null || phrase.isBlank()) {
+            return false;
+        }
+        String pattern = "(^|[^a-z0-9])" + Pattern.quote(phrase.toLowerCase(Locale.ROOT)) + "([^a-z0-9]|$)";
+        return Pattern.compile(pattern).matcher(haystack).find();
+    }
+
+    private static String clean(String value) {
+        if (value == null) {
+            return "";
+        }
+        String stripped = FORMATTING.matcher(value).replaceAll("");
+        return stripped.toLowerCase(Locale.ROOT).trim();
+    }
+
+    private static boolean containsAny(String haystack, List<String> needles) {
         if (haystack == null || haystack.isBlank()) {
             return false;
         }
@@ -220,7 +302,7 @@ public class PestEntityHeuristics {
     }
 
     private String normalizedName(Entity entity) {
-        return entity.getName().getString().toLowerCase(Locale.ROOT);
+        return entity.getName().getString();
     }
 
     private String normalizedType(Entity entity) {
