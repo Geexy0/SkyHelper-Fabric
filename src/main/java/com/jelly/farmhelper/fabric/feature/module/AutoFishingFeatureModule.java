@@ -116,6 +116,16 @@ public class AutoFishingFeatureModule extends MacroExclusiveFeatureModule {
     }
 
     private void tickState(FeatureRuntimeState runtime, FarmHelperConfig config) {
+        // Bite windows on Hypixel are short — never let settle delays swallow a bite.
+        boolean biteNow = runtime.fishingBiteReady || chatBiteHint;
+        if (biteNow && (state == State.WAIT_BITE || state == State.TROPHY_FOCUS || state == State.HUMAN_BREAK)) {
+            long react = config.fishingAntiDetect
+                    ? Math.min(4L, antiDetect.sampleReactionTicks(strength(config)))
+                    : 1L;
+            nextActionTick = runtime.tickCount + Math.max(1L, react);
+            setState(State.REEL, runtime.tickCount);
+        }
+
         if (runtime.tickCount < nextActionTick) {
             return;
         }
@@ -165,6 +175,7 @@ public class AutoFishingFeatureModule extends MacroExclusiveFeatureModule {
                     setState(State.HUMAN_BREAK, runtime.tickCount);
                     return;
                 }
+                // Bite already handled above; combat/trophy only when not biting.
                 if (config.fishingKillSeaCreatures && runtime.fishingSeaCreatureNearby) {
                     setState(State.SEA_COMBAT, runtime.tickCount);
                     return;
@@ -176,15 +187,6 @@ public class AutoFishingFeatureModule extends MacroExclusiveFeatureModule {
                 maybeIdleLook(runtime, config);
                 maybeMicroMove(runtime, config);
 
-                boolean bite = runtime.fishingBiteReady || chatBiteHint;
-                if (bite) {
-                    long react = config.fishingAntiDetect
-                            ? antiDetect.sampleReactionTicks(strength(config))
-                            : 3L;
-                    nextActionTick = runtime.tickCount + react;
-                    setState(State.REEL, runtime.tickCount);
-                    return;
-                }
                 if (!runtime.fishingBobberPresent && ticksInState(runtime.tickCount) > 30L) {
                     setState(State.CAST, runtime.tickCount);
                     return;
@@ -201,7 +203,12 @@ public class AutoFishingFeatureModule extends MacroExclusiveFeatureModule {
                 }
             }
             case REEL -> {
-                queueSelectHotbarItem("rod", runtime.tickCount);
+                // Do not hotbar-thrash on the same tick as use — cast already left the rod selected.
+                if (!runtime.fishingHoldingRod) {
+                    queueSelectHotbarItem("rod", runtime.tickCount);
+                    nextActionTick = runtime.tickCount + 2L;
+                    return;
+                }
                 queueUseHeldItem(runtime.tickCount);
                 chatBiteHint = false;
                 long delay = config.fishingAntiDetect

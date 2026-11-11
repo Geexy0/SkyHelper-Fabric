@@ -10,6 +10,7 @@ class FishingBiteSignalsTest {
     void biteHints() {
         assertTrue(FishingBiteSignals.isBiteHint(FishingBiteSignals.normalize("§aSomething bites!")));
         assertTrue(FishingBiteSignals.isBiteHint(FishingBiteSignals.normalize("!!!")));
+        assertTrue(FishingBiteSignals.isBiteHint(FishingBiteSignals.normalize("§c!!!!")));
         assertFalse(FishingBiteSignals.isBiteHint(FishingBiteSignals.normalize("You caught a fish")));
     }
 

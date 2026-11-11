@@ -6,7 +6,9 @@ import com.jelly.farmhelper.fabric.util.RenderUtils;
 import java.lang.reflect.Field;
 import java.util.Locale;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Hud;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.world.entity.Entity;
@@ -17,10 +19,20 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * Client-side bobber / sea-creature / golden-fish sensors for fishing runtime state.
+ * Bite detection uses multiple signals because Hypixel often never sets vanilla DATA_BITING.
  */
 public final class ClientFishingSensor {
     private static EntityDataAccessor<Boolean> bitingAccessor;
     private static boolean bitingAccessorResolved;
+    private static Field hudTitleField;
+    private static Field hudSubtitleField;
+    private static Field hudOverlayField;
+    private static boolean hudFieldsResolved;
+
+    private static int lastHookId = -1;
+    private static double lastHookY = Double.NaN;
+    private static double lastHookVelY = Double.NaN;
+    private static long biteLatchUntilTick = -1L;
 
     private ClientFishingSensor() {
     }
@@ -47,7 +59,7 @@ public final class ClientFishingSensor {
         ItemStack main = player.getMainHandItem();
         runtime.fishingHoldingRod = main != null && !main.isEmpty() && main.getItem() instanceof FishingRodItem;
 
-        FishingHook ownHook = null;
+        FishingHook ownHook = player.fishing;
         Entity nearestCreature = null;
         double nearestCreatureDist = Double.MAX_VALUE;
         Entity golden = null;
@@ -60,7 +72,7 @@ public final class ClientFishingSensor {
                 continue;
             }
             if (entity instanceof FishingHook hook) {
-                if (hook.getPlayerOwner() == player) {
+                if (ownHook == null && hook.getPlayerOwner() == player) {
                     ownHook = hook;
                 }
                 continue;
@@ -83,9 +95,21 @@ public final class ClientFishingSensor {
             }
         }
 
+        long nowTick = client.level.getGameTime();
         if (ownHook != null) {
             runtime.fishingBobberPresent = true;
-            runtime.fishingBiteReady = isBiting(ownHook);
+            boolean biting = isBiting(ownHook)
+                    || isMotionBite(ownHook, nowTick)
+                    || titleSuggestsBite(client);
+            if (biting) {
+                biteLatchUntilTick = nowTick + 12L;
+            }
+            runtime.fishingBiteReady = biting || nowTick <= biteLatchUntilTick;
+        } else {
+            lastHookId = -1;
+            lastHookY = Double.NaN;
+            lastHookVelY = Double.NaN;
+            biteLatchUntilTick = -1L;
         }
 
         if (nearestCreature != null) {
@@ -111,6 +135,68 @@ public final class ClientFishingSensor {
         }
     }
 
+    private static boolean isMotionBite(FishingHook hook, long nowTick) {
+        int id = hook.getId();
+        double y = hook.getY();
+        double velY = hook.getDeltaMovement().y;
+        boolean bite = false;
+        if (id == lastHookId) {
+            bite = FishingBiteSignals.isMotionBiteSignal(lastHookY, y, lastHookVelY, velY);
+        }
+        lastHookId = id;
+        lastHookY = y;
+        lastHookVelY = velY;
+        return bite;
+    }
+
+    private static boolean titleSuggestsBite(Minecraft client) {
+        resolveHudFields();
+        Hud hud = client.gui == null ? null : client.gui.hud;
+        if (hud == null) {
+            return false;
+        }
+        return textIsBiteHint(readHudComponent(hud, hudTitleField))
+                || textIsBiteHint(readHudComponent(hud, hudSubtitleField))
+                || textIsBiteHint(readHudComponent(hud, hudOverlayField));
+    }
+
+    private static boolean textIsBiteHint(String raw) {
+        return FishingBiteSignals.isBiteHint(FishingBiteSignals.normalize(raw));
+    }
+
+    private static String readHudComponent(Hud hud, Field field) {
+        if (hud == null || field == null) {
+            return "";
+        }
+        try {
+            Object value = field.get(hud);
+            if (value instanceof Component component) {
+                return component.getString();
+            }
+        } catch (Throwable ignored) {
+        }
+        return "";
+    }
+
+    private static void resolveHudFields() {
+        if (hudFieldsResolved) {
+            return;
+        }
+        hudFieldsResolved = true;
+        try {
+            hudTitleField = Hud.class.getDeclaredField("title");
+            hudTitleField.setAccessible(true);
+            hudSubtitleField = Hud.class.getDeclaredField("subtitle");
+            hudSubtitleField.setAccessible(true);
+            hudOverlayField = Hud.class.getDeclaredField("overlayMessageString");
+            hudOverlayField.setAccessible(true);
+        } catch (Throwable ignored) {
+            hudTitleField = null;
+            hudSubtitleField = null;
+            hudOverlayField = null;
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private static boolean isBiting(FishingHook hook) {
         if (hook == null) {
@@ -121,7 +207,9 @@ public final class ClientFishingSensor {
             try {
                 SynchedEntityData data = hook.getEntityData();
                 Boolean value = data.get(bitingAccessor);
-                return Boolean.TRUE.equals(value);
+                if (Boolean.TRUE.equals(value)) {
+                    return true;
+                }
             } catch (Throwable ignored) {
                 // Fall through.
             }
