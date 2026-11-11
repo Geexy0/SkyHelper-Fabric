@@ -123,4 +123,4 @@ Automated macros may violate Hypixel or other server rules. Use at your own risk
 
 ## License
 
-CC0 1.0 (see `LICENSE`).
+MIT (see `LICENSE`).

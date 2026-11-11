@@ -9,7 +9,7 @@
     "BetterFarmHelper contributors",
     "Vvien18"
   ],
-  "license": "Custom",
+  "license": "MIT",
   "icon": "assets/farmhelperfabric/icon.png",
   "environment": "client",
   "entrypoints": {
