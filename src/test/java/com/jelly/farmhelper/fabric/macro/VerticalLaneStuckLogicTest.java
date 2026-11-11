@@ -106,9 +106,9 @@ class VerticalLaneStuckLogicTest {
     }
 
     @Test
-    void wheatPrefersRightWhenBothSidesOpen() {
+    void preferStartSideOnlyWhenExactlyOneSideOpen() {
         assertEquals(
-                VerticalLaneStuckLogic.StartSide.RIGHT,
+                VerticalLaneStuckLogic.StartSide.DEFER,
                 VerticalLaneStuckLogic.preferStartSide(true, true, true)
         );
         assertEquals(
@@ -121,7 +121,19 @@ class VerticalLaneStuckLogicTest {
         );
         assertEquals(
                 VerticalLaneStuckLogic.StartSide.DEFER,
-                VerticalLaneStuckLogic.preferStartSide(false, true, true)
+                VerticalLaneStuckLogic.preferStartSide(false, false, false)
+        );
+    }
+
+    @Test
+    void startsOppositeOfNearerWall() {
+        assertEquals(
+                VerticalLaneStuckLogic.StartSide.LEFT,
+                VerticalLaneStuckLogic.oppositeOfNearerWall(true)
+        );
+        assertEquals(
+                VerticalLaneStuckLogic.StartSide.RIGHT,
+                VerticalLaneStuckLogic.oppositeOfNearerWall(false)
         );
     }
 }

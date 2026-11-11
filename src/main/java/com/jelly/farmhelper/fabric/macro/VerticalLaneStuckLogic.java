@@ -99,23 +99,28 @@ public final class VerticalLaneStuckLogic {
     }
 
     /**
-     * Wheat/potato/carrot should start RIGHT when that side is open. Wall-proximity scanning
-     * otherwise picks LEFT when the left edge is nearer (common at garden spawn).
+     * Immediate open-side pick before wall-distance scan.
+     * Only decides when exactly one side is walkable; otherwise defer so the nearer-wall
+     * scan can send the farmer to the opposite side of that wall.
      */
     public static StartSide preferStartSide(
             boolean cameraLockedCrop,
             boolean rightWalkable,
             boolean leftWalkable
     ) {
-        if (!cameraLockedCrop) {
-            return StartSide.DEFER;
-        }
-        if (rightWalkable) {
+        if (rightWalkable && !leftWalkable) {
             return StartSide.RIGHT;
         }
-        if (leftWalkable) {
+        if (leftWalkable && !rightWalkable) {
             return StartSide.LEFT;
         }
         return StartSide.DEFER;
+    }
+
+    /**
+     * Nearer obstacle/wall on {@code wallOnRight} → start the other way.
+     */
+    public static StartSide oppositeOfNearerWall(boolean wallOnRight) {
+        return wallOnRight ? StartSide.LEFT : StartSide.RIGHT;
     }
 }

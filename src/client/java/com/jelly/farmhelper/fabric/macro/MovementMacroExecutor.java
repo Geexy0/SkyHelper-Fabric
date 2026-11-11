@@ -360,13 +360,9 @@ public class MovementMacroExecutor {
         laneReferenceYaw = closestCardinal(baseYaw);
         laneReferenceYawResolved = true;
         laneShiftDirection = resolveInitialLaneShiftDirection(player.getYRot(), laneReferenceYaw);
-        // Camera-locked wheat/potato/carrot always prefer starting RIGHT (D). Facing-based
-        // preference flips LEFT when body yaw still faces along the row before camera lock.
-        if (activeType != null && activeType.locksCameraLikeWheat()) {
-            moveRight = true;
-        } else {
-            moveRight = resolveFacingPreferredSide(player.getYRot(), laneReferenceYaw, moveRight);
-        }
+        // Initial side is finalized by calculateLegacyVerticalDirection (wall-opposite).
+        // Facing preference is only a fallback until the first NONE→direction resolve.
+        moveRight = resolveFacingPreferredSide(player.getYRot(), laneReferenceYaw, moveRight);
         targetYaw = baseYaw;
         if (activeTuning.motionMode() == CropMacroMotionMode.MUSHROOM_ROTATE && !config.customYaw) {
             targetYaw = laneReferenceYaw + 30f + (float) (ThreadLocalRandom.current().nextDouble(-2.0, 2.0));
@@ -1094,19 +1090,22 @@ public class MovementMacroExecutor {
             return LegacyRouteState.LEFT;
         }
 
+        // Both sides open: walk away from the nearer wall/obstacle.
         for (int i = 1; i < 180; i++) {
-            if (!isWalkableOffset(client, i, 0, routingYaw)) {
-                boolean canContinueRight = isWalkableOffset(client, i - 1, -1, 1, routingYaw)
-                        || isWalkableOffset(client, i - 1, -1, 0, routingYaw);
-                return canContinueRight ? LegacyRouteState.RIGHT : LegacyRouteState.LEFT;
+            boolean rightBlocked = !isWalkableOffset(client, i, 0, routingYaw);
+            boolean leftBlocked = !isWalkableOffset(client, -i, 0, routingYaw);
+            if (rightBlocked && !leftBlocked) {
+                return LegacyRouteState.LEFT;
             }
-            if (!isWalkableOffset(client, -i, 0, routingYaw)) {
-                boolean canContinueLeft = isWalkableOffset(client, -i + 1, 0, 1, routingYaw)
-                        || isWalkableOffset(client, -i + 1, -1, 0, routingYaw);
-                return canContinueLeft ? LegacyRouteState.LEFT : LegacyRouteState.RIGHT;
+            if (leftBlocked && !rightBlocked) {
+                return LegacyRouteState.RIGHT;
+            }
+            if (rightBlocked && leftBlocked) {
+                // Equidistant walls — keep previous facing preference.
+                return moveRight ? LegacyRouteState.RIGHT : LegacyRouteState.LEFT;
             }
         }
-        return LegacyRouteState.RIGHT;
+        return moveRight ? LegacyRouteState.RIGHT : LegacyRouteState.LEFT;
     }
 
     LegacyRouteState calculateLegacyMelonDefaultDirection(Minecraft client) {
