@@ -3,6 +3,7 @@ package com.jelly.farmhelper.fabric.feature.module;
 import com.jelly.farmhelper.fabric.FarmHelperFabric;
 import com.jelly.farmhelper.fabric.config.FarmHelperConfig;
 import com.jelly.farmhelper.fabric.feature.FeatureRuntimeState;
+import com.jelly.farmhelper.fabric.feature.GuiRetryHelper;
 
 public class AutoSellFeatureModule extends MacroExclusiveFeatureModule {
     private enum State {
@@ -43,6 +44,15 @@ public class AutoSellFeatureModule extends MacroExclusiveFeatureModule {
         FarmHelperConfig config = FarmHelperFabric.getConfigManager().getConfig();
         if (!config.enableAutoSell) {
             resetState();
+            return;
+        }
+        if (runtime.jacobContestActive) {
+            // Pause sell cycle during Jacob; resume when contest clears (inventory threshold re-arms).
+            if (isActionRunning()) {
+                endTimedAction("jacob contest pause");
+                resetState();
+            }
+            inventoryFullSinceTick = -1L;
             return;
         }
         if (runtime.activeFailsafe.isPresent()) {
@@ -123,13 +133,17 @@ public class AutoSellFeatureModule extends MacroExclusiveFeatureModule {
                 }
                 if (ticksInState(runtime.tickCount) >= 50L) {
                     String title = runtime.screenTitle == null ? "" : runtime.screenTitle;
+                    String lower = title.toLowerCase(java.util.Locale.ROOT);
                     boolean marketOpen = !title.isBlank()
-                            && (title.toLowerCase(java.util.Locale.ROOT).contains("trade")
-                            || title.toLowerCase(java.util.Locale.ROOT).contains("bazaar")
-                            || title.toLowerCase(java.util.Locale.ROOT).contains("sell"));
-                    if (!marketOpen && stateRetries < GUI_RETRY_LIMIT) {
+                            && (lower.contains("trade")
+                            || lower.contains("bazaar")
+                            || lower.contains("sell")
+                            || lower.contains("market"));
+                    int retryLimit = GuiRetryHelper.clampLimit(GUI_RETRY_LIMIT, 2);
+                    if (!marketOpen && GuiRetryHelper.canRetry(stateRetries, retryLimit)) {
                         stateRetries++;
                         queueCloseScreen(runtime.tickCount);
+                        // Backoff is applied via OPEN_MARKET's fixed wait before WAIT_MARKET_SCREEN.
                         setState(State.OPEN_MARKET, runtime.tickCount);
                         return;
                     }

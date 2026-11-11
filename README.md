@@ -53,11 +53,15 @@ Keybinds live under **Options → Controls → FarmHelper** (authoritative). Adv
 
 ### Manual UI checklist (after SDL mouse fix)
 
-1. `/fh ui` opens; sidebar section switching works (Quick Setup → Macro → …).
+1. `/fh ui` opens; sidebar section switching works (Quick Setup → Macro → … → Farming).
 2. Left-click toggles, dropdowns, and text fields respond.
 3. Search filters setting rows.
 4. Escape / close button dismisses the screen.
 5. With macro running and a rewarp/pest marker active, HUD shows projected box/tracer/text overlays.
+6. Apply Preset for wheat/potato/carrot/nether wart/sugar cane/cocoa/mushroom sets camera defaults.
+7. Status HUD shows BPS + session profit; after `/warp garden`, briefly shows camera realign.
+8. Pest destroyer / ESP labels confirmed pests only (no bare bats).
+9. During Jacob contest, pests destroyer + auto-sell pause; scheduler pause respects config.
 
 ## Build from source
 

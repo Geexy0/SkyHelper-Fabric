@@ -1,5 +1,6 @@
 package com.jelly.farmhelper.fabric.state;
 
+import com.jelly.farmhelper.fabric.failsafe.JacobChatSignals;
 import com.jelly.farmhelper.fabric.util.AngleUtils;
 import com.jelly.farmhelper.fabric.util.BlockUtils;
 import com.jelly.farmhelper.fabric.util.PlotUtils;
@@ -111,8 +112,8 @@ public final class GameStateHandler {
     }
 
     private void updateContestState(List<String> scoreboard) {
-        String aggregate = String.join(" ", scoreboard).toLowerCase(Locale.ROOT);
-        jacobContestActive = aggregate.contains("jacob") || aggregate.contains("contest");
+        String aggregate = JacobChatSignals.normalize(String.join(" ", scoreboard));
+        jacobContestActive = JacobChatSignals.isActiveFromHudAggregate(aggregate);
     }
 
     private void updateBuffState(List<String> scoreboard, List<String> tablist) {

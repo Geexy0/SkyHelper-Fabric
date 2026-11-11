@@ -3,6 +3,7 @@ package com.jelly.farmhelper.fabric.feature.module;
 import com.jelly.farmhelper.fabric.FarmHelperFabric;
 import com.jelly.farmhelper.fabric.config.FarmHelperConfig;
 import com.jelly.farmhelper.fabric.feature.FeatureRuntimeState;
+import com.jelly.farmhelper.fabric.feature.GuiRetryHelper;
 import com.jelly.farmhelper.fabric.state.RuntimeGuards;
 
 import java.util.Locale;
@@ -291,12 +292,13 @@ public class PestsDestroyerFeatureModule extends MacroExclusiveFeatureModule {
 
                 if (ticksInState(runtime.tickCount) >= SCREEN_WAIT_TIMEOUT_TICKS) {
                     closeScreenIfOpen(runtime, runtime.tickCount);
-                    int retryLimit = Math.max(2, config.pestsDestroyerRetryLimit);
-                    if (stateRetries < retryLimit) {
+                    int retryLimit = GuiRetryHelper.clampLimit(config.pestsDestroyerRetryLimit, 2);
+                    if (GuiRetryHelper.canRetry(stateRetries, retryLimit)) {
                         stateRetries++;
                         FarmHelperFabric.getWebhookService().debugTrace(
                                 "feature",
                                 "pests_destroyer desk screen timeout, retry " + stateRetries + "/" + retryLimit
+                                        + " backoff=" + GuiRetryHelper.backoffTicks(stateRetries, 20L)
                         );
                         setState(State.OPEN_DESK, runtime.tickCount, false);
                     } else {

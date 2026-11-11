@@ -38,9 +38,12 @@ public final class ProfitHudRenderer {
         int x = Math.max(4, config.profitHudX);
         int y = Math.max(4, config.profitHudY);
         int color = 0xFFF7DCA4;
-        String header = "Profit HUD";
+        String header = "Session Profit";
         String totalLine = String.format(Locale.US, "Total: $%,.0f", ProfitCalculatorFeatureModule.getTotalProfitCoins());
         String hourlyLine = String.format(Locale.US, "Hourly: $%,.0f/h", ProfitCalculatorFeatureModule.getHourlyProfitCoins());
+        String bpsLine = String.format(Locale.US, "BPS: %.1f (avg %.1f)",
+                com.jelly.farmhelper.fabric.feature.module.BpsTrackerFeatureModule.getCurrentBps(),
+                com.jelly.farmhelper.fabric.feature.module.BpsTrackerFeatureModule.getAverageBps());
         String pricingMode = ProfitCalculatorFeatureModule.getBazaarPricingMode();
         String pricingLine = "Pricing: " + pricingMode;
 
@@ -54,11 +57,12 @@ public final class ProfitHudRenderer {
         int width = client.font.width(header);
         width = Math.max(width, client.font.width(totalLine));
         width = Math.max(width, client.font.width(hourlyLine));
+        width = Math.max(width, client.font.width(bpsLine));
         width = Math.max(width, client.font.width(pricingLine));
         for (Map.Entry<String, Long> entry : topEntries) {
             width = Math.max(width, client.font.width(entry.getKey() + ": " + entry.getValue()));
         }
-        int lines = 4 + topEntries.size();
+        int lines = 5 + topEntries.size();
         int panelWidth = width + 10;
         int panelHeight = lines * 10 + 8;
         drawContext.fill(x - 4, y - 4, x - 4 + panelWidth, y - 4 + panelHeight, 0x78101824);
@@ -70,6 +74,8 @@ public final class ProfitHudRenderer {
         drawContext.text(client.font, totalLine, x, y, color, true);
         y += 10;
         drawContext.text(client.font, hourlyLine, x, y, color, true);
+        y += 10;
+        drawContext.text(client.font, bpsLine, x, y, 0xFF55FF55, true);
         y += 10;
         drawContext.text(client.font, pricingLine, x, y,
                 "live".equalsIgnoreCase(pricingMode) ? 0xFF55FF55 : 0xFFFFAA00, true);

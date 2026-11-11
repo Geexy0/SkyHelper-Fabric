@@ -1163,13 +1163,17 @@ public class ClientAutomationExecutor {
                 if (entity instanceof Player) {
                     continue;
                 }
-                double pestScore = pestHeuristics.score(entity);
+                // Hunt uses ESP-hardened gate + confirmed; bare bats / vanilla names never qualify.
+                boolean espOk = pestHeuristics.isEspPest(entity);
                 boolean confirmed = pestHeuristics.isConfirmedPest(entity);
-                boolean likely = pestHeuristics.isLikelyPest(entity);
+                if (!espOk && !confirmed) {
+                    continue;
+                }
                 if (looksLikeNonPestTarget(entityName, typeName) && !confirmed) {
                     continue;
                 }
-                if (!confirmed && !likely) {
+                double pestScore = pestHeuristics.score(entity);
+                if (pestScore <= 0.0 && !confirmed) {
                     continue;
                 }
                 if (pestScore > bestPestScore || (pestScore == bestPestScore && distSq < bestDistanceSq)) {
@@ -1291,9 +1295,14 @@ public class ClientAutomationExecutor {
         RenderUtils.drawTracer(target, PEST_TRACER_COLOR, 8L);
         RenderUtils.drawBox(entity.getBoundingBox().inflate(0.08), PEST_BOX_COLOR, 8L);
         String name = entity.getName().getString();
-        if (name != null && !name.isBlank()) {
-            RenderUtils.drawText(target.add(0.0, 0.35, 0.0), "Pest " + phaseLabel + ": " + name, PEST_TEXT_COLOR, 8L);
-        }
+        String label = (name == null || name.isBlank()) ? "target" : name.trim();
+        String confidence = pestHeuristics.isConfirmedPest(entity) ? "confirmed" : "esp";
+        RenderUtils.drawText(
+                target.add(0.0, 0.35, 0.0),
+                "Pest [" + confidence + "] " + phaseLabel + ": " + label,
+                PEST_TEXT_COLOR,
+                8L
+        );
     }
 
     private void stopMovement(Minecraft client) {

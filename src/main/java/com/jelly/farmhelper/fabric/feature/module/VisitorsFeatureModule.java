@@ -3,6 +3,7 @@ package com.jelly.farmhelper.fabric.feature.module;
 import com.jelly.farmhelper.fabric.FarmHelperFabric;
 import com.jelly.farmhelper.fabric.config.FarmHelperConfig;
 import com.jelly.farmhelper.fabric.feature.FeatureRuntimeState;
+import com.jelly.farmhelper.fabric.feature.GuiRetryHelper;
 import com.jelly.farmhelper.fabric.feature.VisitorOfferSnapshot;
 
 import java.util.ArrayDeque;
@@ -725,8 +726,8 @@ public class VisitorsFeatureModule extends MacroExclusiveFeatureModule {
     }
 
     private boolean retryState(FarmHelperConfig config, long nowTick, State retryState, String reason) {
-        int limit = Math.max(1, config.visitorsMacroRetryLimit);
-        if (stateRetries < limit) {
+        int limit = GuiRetryHelper.clampLimit(config.visitorsMacroRetryLimit, 1);
+        if (GuiRetryHelper.canRetry(stateRetries, limit)) {
             stateRetries++;
             setState(retryState, nowTick, false);
             return false;

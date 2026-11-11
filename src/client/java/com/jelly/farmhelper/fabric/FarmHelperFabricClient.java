@@ -129,6 +129,8 @@ public class FarmHelperFabricClient implements ClientModInitializer {
     private boolean postJoinAligned;
     private boolean pendingPostWarpRealign;
     private long postWarpRealignAfterTick = -1L;
+    private int postWarpRealignPassesRemaining;
+    private static volatile boolean postWarpRealigning;
     private boolean wasNearRewarpPoint;
     private RewarpPoint pendingRewarpPoint;
     private long pendingRewarpReadyTick = -1L;
@@ -271,6 +273,8 @@ public class FarmHelperFabricClient implements ClientModInitializer {
             postJoinAligned = false;
             pendingPostWarpRealign = false;
             postWarpRealignAfterTick = -1L;
+            postWarpRealignPassesRemaining = 0;
+            postWarpRealigning = false;
             wasNearRewarpPoint = false;
             clearPendingRewarp();
             reconnectCooldownUntilTick = tickCounter + 20L;
@@ -1509,16 +1513,30 @@ public class FarmHelperFabricClient implements ClientModInitializer {
         }
 
         if (pendingPostWarpRealign && tickCounter >= postWarpRealignAfterTick) {
-            pendingPostWarpRealign = false;
-            postWarpRealignAfterTick = -1L;
+            postWarpRealigning = true;
             applyPostWarpCamera(client, config);
             MOVEMENT_MACRO_EXECUTOR.realignCameraAfterWarp(client, config);
+            postWarpRealignPassesRemaining = Math.max(0, postWarpRealignPassesRemaining - 1);
+            if (postWarpRealignPassesRemaining > 0) {
+                // Second pass after chunk settle — S_WHEAT/potato/carrot yaw lock often drifts once.
+                postWarpRealignAfterTick = tickCounter + 18L;
+            } else {
+                pendingPostWarpRealign = false;
+                postWarpRealignAfterTick = -1L;
+                postWarpRealigning = false;
+            }
         }
     }
 
     private void schedulePostWarpRealign(long delayTicks) {
         pendingPostWarpRealign = true;
+        postWarpRealigning = true;
+        postWarpRealignPassesRemaining = 2;
         postWarpRealignAfterTick = tickCounter + Math.max(8L, delayTicks);
+    }
+
+    public static boolean isPostWarpRealigning() {
+        return postWarpRealigning;
     }
 
     private void applyPostWarpCamera(Minecraft client, FarmHelperConfig config) {

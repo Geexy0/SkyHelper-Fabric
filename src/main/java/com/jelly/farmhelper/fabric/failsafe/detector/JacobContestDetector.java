@@ -2,14 +2,12 @@ package com.jelly.farmhelper.fabric.failsafe.detector;
 
 import com.jelly.farmhelper.fabric.config.FarmHelperConfig;
 import com.jelly.farmhelper.fabric.failsafe.FailsafeType;
+import com.jelly.farmhelper.fabric.failsafe.JacobChatSignals;
 import com.jelly.farmhelper.fabric.runtime.RuntimeSnapshot;
 
-import java.util.Locale;
 import java.util.Optional;
-import java.util.regex.Pattern;
 
 public class JacobContestDetector implements FailsafeDetector {
-    private static final Pattern MC_FORMATTING = Pattern.compile("§.");
     private long lastProcessedChatSeq = -1L;
 
     @Override
@@ -31,22 +29,8 @@ public class JacobContestDetector implements FailsafeDetector {
         if (raw.isBlank()) {
             return Optional.empty();
         }
-        String normalized = MC_FORMATTING.matcher(raw).replaceAll("").toLowerCase(Locale.ROOT);
-
-        // Ignore NPC result chatter and reward lines from Jacob.
-        if (normalized.contains("[npc] jacob")
-                || normalized.contains("let me count the final results")
-                || normalized.contains("didn't earn a medal")
-                || normalized.contains("participation reward")) {
-            return Optional.empty();
-        }
-
-        boolean contestStart = normalized.contains("jacob")
-                && (normalized.contains("contest has started")
-                || normalized.contains("jacob's contest has started")
-                || normalized.contains("new jacob contest"));
-
-        if (!contestStart) {
+        String normalized = JacobChatSignals.normalize(raw);
+        if (!JacobChatSignals.isContestStart(normalized)) {
             return Optional.empty();
         }
 

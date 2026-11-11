@@ -26,8 +26,14 @@ Removed / neutralized versus older FarmHelper builds:
 
 - `S_WHEAT` / `S_POTATO` / `S_CARROT` — S-shape vertical with forced yaw **-90** and pitch **0**
 - `S_NETHER_WART` — S-shape with pitch **~3.0**
-- Pest ESP requires an explicit pest species name or texture hash (bare bats rejected)
+- `S_SUGAR_CANE` — S-shape, pitch **0**, yaw locked to current cardinal on Apply Preset
+- `S_COCOA_BEANS*` / `S_COCOA_BEANS_LEFT_RIGHT` — pitch **~-70**, yaw ±90 on Apply Preset
+- `S_MUSHROOM*` — pitch **-45** / **-30** defaults on Apply Preset
+- Pest ESP / hunt requires an explicit pest species name or texture hash (bare bats rejected)
+- Vertical lanes: row-end water/slab hop before anti-stuck; post-switch yaw relock for camera-locked crops
+- Post-warp camera: dual-pass realign after `/warp garden` with HUD “realigning” status
+- Jacob HUD match requires **jacob + contest** together (bare “contest” ignored)
 
 ## Still WIP
 
-Expect edge-case bugs on unusual garden layouts, Jacob contests, and menu automation. Core lane farming is the best-supported path.
+Expect edge-case bugs on unusual garden layouts. Core lane farming + visitors/sell/pests menu retries are the best-supported path.

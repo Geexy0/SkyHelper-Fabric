@@ -6,12 +6,14 @@ package com.jelly.farmhelper.fabric.macro;
 public final class VerticalLaneStuckLogic {
     public static final int ROW_END_STUCK_THRESHOLD = 8;
     public static final int SWITCH_STUCK_THRESHOLD = 6;
+    public static final int HOP_STUCK_THRESHOLD = 4;
 
     public enum Decision {
         CONTINUE_SIDE,
         SWITCH_LANE,
         ANTI_STUCK_RESET,
-        RECALCULATE
+        RECALCULATE,
+        FORWARD_HOP
     }
 
     private VerticalLaneStuckLogic() {
@@ -24,11 +26,27 @@ public final class VerticalLaneStuckLogic {
             boolean allowBack,
             int stuckNoExitTicks
     ) {
+        return decideWhileStrafing(sideWalkable, frontWalkable, backWalkable, allowBack, false, stuckNoExitTicks);
+    }
+
+    public static Decision decideWhileStrafing(
+            boolean sideWalkable,
+            boolean frontWalkable,
+            boolean backWalkable,
+            boolean allowBack,
+            boolean forwardHopAvailable,
+            int stuckNoExitTicks
+    ) {
         if (sideWalkable) {
             return Decision.CONTINUE_SIDE;
         }
         if (frontWalkable || (allowBack && backWalkable)) {
             return Decision.SWITCH_LANE;
+        }
+        // Row-end water/slab: prefer a short forward hop before full anti-stuck reset.
+        if (forwardHopAvailable && stuckNoExitTicks >= HOP_STUCK_THRESHOLD
+                && stuckNoExitTicks < ROW_END_STUCK_THRESHOLD) {
+            return Decision.FORWARD_HOP;
         }
         if (stuckNoExitTicks >= ROW_END_STUCK_THRESHOLD) {
             return Decision.ANTI_STUCK_RESET;
@@ -42,12 +60,35 @@ public final class VerticalLaneStuckLogic {
             boolean backWalkable,
             int stuckNoExitTicks
     ) {
+        return decideWhileSwitching(resolvedSide, frontWalkable, backWalkable, false, stuckNoExitTicks);
+    }
+
+    public static Decision decideWhileSwitching(
+            boolean resolvedSide,
+            boolean frontWalkable,
+            boolean backWalkable,
+            boolean forwardHopAvailable,
+            int stuckNoExitTicks
+    ) {
         if (resolvedSide) {
             return Decision.CONTINUE_SIDE;
         }
-        if (!frontWalkable && !backWalkable && stuckNoExitTicks >= SWITCH_STUCK_THRESHOLD) {
-            return Decision.ANTI_STUCK_RESET;
+        if (!frontWalkable && !backWalkable) {
+            if (forwardHopAvailable && stuckNoExitTicks >= HOP_STUCK_THRESHOLD
+                    && stuckNoExitTicks < SWITCH_STUCK_THRESHOLD) {
+                return Decision.FORWARD_HOP;
+            }
+            if (stuckNoExitTicks >= SWITCH_STUCK_THRESHOLD) {
+                return Decision.ANTI_STUCK_RESET;
+            }
         }
         return Decision.RECALCULATE;
+    }
+
+    /**
+     * After a lane switch resolves, camera-locked presets should snap lane yaw to the nearest cardinal.
+     */
+    public static boolean shouldRelockCardinalYaw(boolean cameraLockedPreset, boolean resolvedSide) {
+        return cameraLockedPreset && resolvedSide;
     }
 }

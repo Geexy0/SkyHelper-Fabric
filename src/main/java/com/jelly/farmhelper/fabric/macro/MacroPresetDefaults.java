@@ -38,6 +38,43 @@ public final class MacroPresetDefaults {
             if (!config.customYaw) {
                 config.customYawLevel = 0f;
             }
+            return;
+        }
+
+        if (type == LegacyMacroType.S_SUGAR_CANE) {
+            config.macroPattern = MacroPattern.S_SHAPE;
+            config.customPitch = true;
+            config.customPitchLevel = 0f;
+            if (!config.customYaw) {
+                config.customYaw = true;
+                config.customYawLevel = 0f;
+            }
+            return;
+        }
+
+        if (type == LegacyMacroType.S_COCOA_BEANS_LEFT_RIGHT
+                || type == LegacyMacroType.S_COCOA_BEANS
+                || type == LegacyMacroType.S_COCOA_BEANS_TRAPDOORS) {
+            config.macroPattern = MacroPattern.S_SHAPE;
+            config.customPitch = true;
+            config.customPitchLevel = -70f;
+            if (!config.customYaw) {
+                config.customYaw = true;
+                config.customYawLevel = type == LegacyMacroType.S_COCOA_BEANS_LEFT_RIGHT ? 90f : -90f;
+            }
+            return;
+        }
+
+        if (type == LegacyMacroType.S_MUSHROOM
+                || type == LegacyMacroType.S_MUSHROOM_ROTATE
+                || type == LegacyMacroType.S_MUSHROOM_SDS) {
+            config.macroPattern = MacroPattern.S_SHAPE;
+            config.customPitch = true;
+            // 45° mushroom looks slightly down; rotate variant keeps a mild pitch.
+            config.customPitchLevel = type == LegacyMacroType.S_MUSHROOM ? -45f : -30f;
+            if (!config.customYaw) {
+                config.customYawLevel = -45f;
+            }
         }
     }
 }

@@ -2,10 +2,10 @@ package com.jelly.farmhelper.fabric.feature.module;
 
 import com.jelly.farmhelper.fabric.FarmHelperFabric;
 import com.jelly.farmhelper.fabric.config.FarmHelperConfig;
+import com.jelly.farmhelper.fabric.failsafe.JacobChatSignals;
 import com.jelly.farmhelper.fabric.feature.FeatureRuntimeState;
 import com.jelly.farmhelper.fabric.macro.MacroState;
 
-import java.util.Locale;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class SchedulerFeatureModule extends AbstractFeatureModule {
@@ -67,16 +67,12 @@ public class SchedulerFeatureModule extends AbstractFeatureModule {
         if (message == null || message.isBlank()) {
             return;
         }
-        String normalized = message.toLowerCase(Locale.ROOT);
-        if (normalized.contains("jacob's contest")
-                || normalized.contains("starts in")
-                || normalized.contains("contest has started")) {
+        String normalized = JacobChatSignals.normalize(message);
+        if (JacobChatSignals.isContestStart(normalized)) {
             inJacobContest = true;
             return;
         }
-        if (normalized.contains("contest has ended")
-                || normalized.contains("jacob's contest is over")
-                || normalized.contains("new jacob contest")) {
+        if (JacobChatSignals.isContestEnd(normalized)) {
             inJacobContest = false;
         }
     }

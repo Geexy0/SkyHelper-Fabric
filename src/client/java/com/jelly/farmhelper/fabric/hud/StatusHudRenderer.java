@@ -6,6 +6,7 @@ import com.jelly.farmhelper.fabric.config.FarmHelperConfig;
 import com.jelly.farmhelper.fabric.feature.module.AutoReconnectFeatureModule;
 import com.jelly.farmhelper.fabric.feature.module.BpsTrackerFeatureModule;
 import com.jelly.farmhelper.fabric.feature.module.LagDetectorFeatureModule;
+import com.jelly.farmhelper.fabric.feature.module.ProfitCalculatorFeatureModule;
 import com.jelly.farmhelper.fabric.feature.module.SchedulerFeatureModule;
 import com.jelly.farmhelper.fabric.feature.module.UsageStatsFeatureModule;
 import com.jelly.farmhelper.fabric.macro.MacroState;
@@ -88,10 +89,23 @@ public final class StatusHudRenderer {
             y += 10;
         }
 
+        String dirName = FarmHelperFabricClient.getMovementMacroExecutor().getDirectionName();
+        if (FarmHelperFabricClient.isPostWarpRealigning() || "POST_WARP_ALIGN".equals(dirName)) {
+            drawContext.text(client.font, "Camera: realigning after warp", x, y, 0xFF55AAFF, true);
+            y += 10;
+        }
         drawContext.text(client.font,
                 "Pattern: " + FarmHelperFabric.getConfigManager().getConfig().macroPattern
-                        + " Dir: " + FarmHelperFabricClient.getMovementMacroExecutor().getDirectionName(),
+                        + " Dir: " + dirName,
                 x, y, color, true);
+        y += 10;
+        drawContext.text(client.font,
+                String.format("BPS: %.1f avg %.1f | Profit: $%,.0f ($%,.0f/h)",
+                        BpsTrackerFeatureModule.getCurrentBps(),
+                        BpsTrackerFeatureModule.getAverageBps(),
+                        ProfitCalculatorFeatureModule.getTotalProfitCoins(),
+                        ProfitCalculatorFeatureModule.getHourlyProfitCoins()),
+                x, y, 0xFF8CD5A8, true);
         y += 10;
 
         drawContext.text(client.font,
@@ -105,14 +119,6 @@ public final class StatusHudRenderer {
         drawContext.text(client.font,
                 "Pests: " + FarmHelperFabricClient.getGameStateHandler().getTotalPests()
                         + " (top plot " + FarmHelperFabricClient.getGameStateHandler().getMostInfestedPlot() + ")",
-                x, y, color, true);
-        y += 10;
-
-        drawContext.text(client.font,
-                String.format("BPS: %.1f (avg %.1f)%s",
-                        BpsTrackerFeatureModule.getCurrentBps(),
-                        BpsTrackerFeatureModule.getAverageBps(),
-                        BpsTrackerFeatureModule.isPaused() ? " paused" : ""),
                 x, y, color, true);
         y += 10;
 
