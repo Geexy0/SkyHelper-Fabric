@@ -439,6 +439,10 @@ public class FarmHelperFabricClient implements ClientModInitializer {
         updateFeatureRuntimeState();
         ClientFishingSensor.update(client, FEATURE_RUNTIME_STATE, FarmHelperFabric.getConfigManager().getConfig());
         FarmHelperFabric.getFeatureManager().tickEnabledFeatures(FEATURE_RUNTIME_STATE);
+        // Fishing reel must not wait on the 2-tick action-queue throttle.
+        if (FarmHelperFabric.consumeFishingReelRequest()) {
+            com.jelly.farmhelper.fabric.fishing.ClientFishingControls.useHeldNow(client);
+        }
         processClientActionQueue(client);
         tickPestEntityRendering(client);
         tickAutoReconnect(client);

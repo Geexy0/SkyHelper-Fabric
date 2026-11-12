@@ -22,6 +22,7 @@ public class FarmHelperFabric implements ModInitializer {
     private static final LocalDebugLogService DEBUG_LOG_SERVICE = new LocalDebugLogService();
     private static final ClientActionQueue CLIENT_ACTION_QUEUE = new ClientActionQueue();
     private static final FarmEventBus EVENT_BUS = new FarmEventBus();
+    private static volatile boolean fishingReelRequested;
 
     @Override
     public void onInitialize() {
@@ -64,5 +65,18 @@ public class FarmHelperFabric implements ModInitializer {
 
     public static FarmEventBus getEventBus() {
         return EVENT_BUS;
+    }
+
+    /** Main→client bridge: auto-fish requests an immediate rod use (bypass action-queue throttle). */
+    public static void requestFishingReel() {
+        fishingReelRequested = true;
+    }
+
+    public static boolean consumeFishingReelRequest() {
+        if (!fishingReelRequested) {
+            return false;
+        }
+        fishingReelRequested = false;
+        return true;
     }
 }

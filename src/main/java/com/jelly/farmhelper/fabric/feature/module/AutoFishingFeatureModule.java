@@ -4,6 +4,7 @@ import com.jelly.farmhelper.fabric.FarmHelperFabric;
 import com.jelly.farmhelper.fabric.config.FarmHelperConfig;
 import com.jelly.farmhelper.fabric.feature.FeatureRuntimeState;
 import com.jelly.farmhelper.fabric.fishing.FishingAntiDetect;
+import com.jelly.farmhelper.fabric.fishing.FishingBiteLatch;
 import com.jelly.farmhelper.fabric.fishing.FishingBiteSignals;
 import com.jelly.farmhelper.fabric.fishing.FishingEntityHeuristics;
 import com.jelly.farmhelper.fabric.fishing.FishingWeaponMatcher;
@@ -117,16 +118,14 @@ public class AutoFishingFeatureModule extends MacroExclusiveFeatureModule {
 
     private void tickState(FeatureRuntimeState runtime, FarmHelperConfig config) {
         // Bite windows on Hypixel are short — never let settle delays swallow a bite.
-        boolean biteNow = runtime.fishingBiteReady || chatBiteHint;
+        boolean biteNow = runtime.fishingBiteReady || chatBiteHint || FishingBiteLatch.isActive(runtime.tickCount);
         if (biteNow && (state == State.WAIT_BITE || state == State.TROPHY_FOCUS || state == State.HUMAN_BREAK)) {
-            long react = config.fishingAntiDetect
-                    ? Math.min(4L, antiDetect.sampleReactionTicks(strength(config)))
-                    : 1L;
-            nextActionTick = runtime.tickCount + Math.max(1L, react);
+            // Pull ASAP. Anti-detect reaction delay was swallowing Hypixel bite windows.
+            nextActionTick = runtime.tickCount;
             setState(State.REEL, runtime.tickCount);
         }
 
-        if (runtime.tickCount < nextActionTick) {
+        if (runtime.tickCount < nextActionTick && state != State.REEL) {
             return;
         }
 
@@ -203,14 +202,10 @@ public class AutoFishingFeatureModule extends MacroExclusiveFeatureModule {
                 }
             }
             case REEL -> {
-                // Do not hotbar-thrash on the same tick as use — cast already left the rod selected.
-                if (!runtime.fishingHoldingRod) {
-                    queueSelectHotbarItem("rod", runtime.tickCount);
-                    nextActionTick = runtime.tickCount + 2L;
-                    return;
-                }
-                queueUseHeldItem(runtime.tickCount);
+                // Prefer direct client use — the throttled action queue was missing bite windows.
+                FarmHelperFabric.requestFishingReel();
                 chatBiteHint = false;
+                FishingBiteLatch.clear();
                 long delay = config.fishingAntiDetect
                         ? antiDetect.sampleDelayTicks(180L, 480L, strength(config))
                         : 5L;

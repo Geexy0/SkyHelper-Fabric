@@ -20,4 +20,13 @@ class FishingBiteSignalsTest {
         assertTrue(FishingBiteSignals.isStaffOrPauseHint(FishingBiteSignals.normalize("Warping...")));
         assertFalse(FishingBiteSignals.isStaffOrPauseHint(FishingBiteSignals.normalize("Good catch!")));
     }
+
+    @Test
+    void biteSoundAndParticleHints() {
+        assertTrue(FishingBiteSignals.isBiteSoundHint("minecraft:entity.fishing_bobber.splash"));
+        assertTrue(FishingBiteSignals.isBiteSoundHint("minecraft:block.note_block.pling"));
+        assertFalse(FishingBiteSignals.isBiteSoundHint("minecraft:entity.cow.ambient"));
+        assertTrue(FishingBiteSignals.isBiteParticleHint("fishing"));
+        assertTrue(FishingBiteSignals.isBiteParticleHint("splash"));
+    }
 }

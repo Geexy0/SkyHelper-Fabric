@@ -6,6 +6,8 @@ import com.jelly.farmhelper.fabric.event.ChunkServerLoadEvent;
 import com.jelly.farmhelper.fabric.event.ReceivePacketEvent;
 import com.jelly.farmhelper.fabric.event.SpawnObjectEvent;
 import com.jelly.farmhelper.fabric.event.SpawnParticleEvent;
+import com.jelly.farmhelper.fabric.fishing.FishingBiteLatch;
+import com.jelly.farmhelper.fabric.fishing.FishingBiteSignals;
 import com.jelly.farmhelper.fabric.util.TablistUtils;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -19,6 +21,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
 import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
 import net.minecraft.network.protocol.game.ClientboundContainerSetSlotPacket;
@@ -26,8 +29,12 @@ import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
 import net.minecraft.network.protocol.game.ClientboundLevelParticlesPacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerRotationPacket;
+import net.minecraft.network.protocol.game.ClientboundSetActionBarTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket;
+import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTimePacket;
+import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
+import net.minecraft.network.protocol.game.ClientboundSoundPacket;
 import net.minecraft.network.protocol.game.ClientboundTabListPacket;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.PositionMoveRotation;
@@ -162,6 +169,61 @@ public class ClientPlayNetworkHandlerMixin {
                 new Vec3(packet.xDist(), packet.yDist(), packet.zDist()),
                 packet.count()
         ));
+        if (FarmHelperFabric.getConfigManager().getConfig().enableAutoFishing
+                && packet.particle() != null
+                && FishingBiteSignals.isBiteParticleHint(String.valueOf(packet.particle()))) {
+            markFishingBite("particle");
+        }
+    }
+
+    @Inject(method = "handleSoundEvent", at = @At("HEAD"), require = 0)
+    private void farmhelper$onSound(ClientboundSoundPacket packet, CallbackInfo ci) {
+        if (packet == null || !FarmHelperFabric.getConfigManager().getConfig().enableAutoFishing) {
+            return;
+        }
+        String soundId = "";
+        try {
+            if (packet.getSound() != null && packet.getSound().value() != null
+                    && packet.getSound().value().location() != null) {
+                soundId = packet.getSound().value().location().toString();
+            }
+        } catch (Throwable ignored) {
+            soundId = String.valueOf(packet.getSound());
+        }
+        if (FishingBiteSignals.isBiteSoundHint(soundId)) {
+            markFishingBite("sound:" + soundId);
+        }
+    }
+
+    @Inject(method = "setTitleText", at = @At("HEAD"), require = 0)
+    private void farmhelper$onTitle(ClientboundSetTitleTextPacket packet, CallbackInfo ci) {
+        markBiteFromComponent(packet == null ? null : packet.text(), "title");
+    }
+
+    @Inject(method = "setSubtitleText", at = @At("HEAD"), require = 0)
+    private void farmhelper$onSubtitle(ClientboundSetSubtitleTextPacket packet, CallbackInfo ci) {
+        markBiteFromComponent(packet == null ? null : packet.text(), "subtitle");
+    }
+
+    @Inject(method = "setActionBarText", at = @At("HEAD"), require = 0)
+    private void farmhelper$onActionBar(ClientboundSetActionBarTextPacket packet, CallbackInfo ci) {
+        markBiteFromComponent(packet == null ? null : packet.text(), "actionbar");
+    }
+
+    private static void markBiteFromComponent(Component text, String reason) {
+        if (!FarmHelperFabric.getConfigManager().getConfig().enableAutoFishing || text == null) {
+            return;
+        }
+        String normalized = FishingBiteSignals.normalize(text.getString());
+        if (FishingBiteSignals.isBiteHint(normalized)) {
+            markFishingBite(reason);
+        }
+    }
+
+    private static void markFishingBite(String reason) {
+        Minecraft client = Minecraft.getInstance();
+        long now = client != null && client.level != null ? client.level.getGameTime() : 0L;
+        FishingBiteLatch.mark(now, 20, reason);
     }
 
     @Inject(method = "handleAddEntity", at = @At("HEAD"), require = 0)

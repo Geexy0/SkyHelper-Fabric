@@ -42,13 +42,40 @@ public final class FishingBiteSignals {
             return false;
         }
         double dy = currY - prevY;
-        if (dy <= -0.04) {
+        // Soft thresholds: Hypixel bobbers often twitch less than vanilla.
+        if (dy <= -0.02) {
             return true;
         }
         return !Double.isNaN(prevVelY)
                 && !Double.isNaN(currVelY)
-                && prevVelY > -0.08
-                && currVelY <= -0.12;
+                && prevVelY > -0.04
+                && currVelY <= -0.06;
+    }
+
+    public static boolean isBiteSoundHint(String soundId) {
+        String id = normalize(soundId);
+        if (id.isBlank()) {
+            return false;
+        }
+        return id.contains("fishing_bobber")
+                || id.contains("fishing.bobber")
+                || id.contains("entity.fishing_bobber.splash")
+                || id.contains("entity.player.splash")
+                || id.contains("note_block.pling")
+                || id.contains("note.pling")
+                || id.contains("block.note_block.pling")
+                || (id.contains("pling") && (id.contains("note") || id.contains("pling")));
+    }
+
+    public static boolean isBiteParticleHint(String particleId) {
+        String id = normalize(particleId);
+        if (id.isBlank()) {
+            return false;
+        }
+        return id.contains("fishing")
+                || id.contains("splash")
+                || (id.contains("bubble") && id.contains("column"))
+                || id.contains("wake");
     }
 
     public static boolean isStaffOrPauseHint(String normalized) {

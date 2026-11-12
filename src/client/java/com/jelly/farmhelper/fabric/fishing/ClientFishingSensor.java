@@ -32,7 +32,6 @@ public final class ClientFishingSensor {
     private static int lastHookId = -1;
     private static double lastHookY = Double.NaN;
     private static double lastHookVelY = Double.NaN;
-    private static long biteLatchUntilTick = -1L;
 
     private ClientFishingSensor() {
     }
@@ -57,13 +56,15 @@ public final class ClientFishingSensor {
 
         LocalPlayer player = client.player;
         ItemStack main = player.getMainHandItem();
-        runtime.fishingHoldingRod = main != null && !main.isEmpty() && main.getItem() instanceof FishingRodItem;
+        runtime.fishingHoldingRod = isRodStack(main);
 
         FishingHook ownHook = player.fishing;
         Entity nearestCreature = null;
         double nearestCreatureDist = Double.MAX_VALUE;
         Entity golden = null;
         double goldenDist = Double.MAX_VALUE;
+        FishingHook nearestAnyHook = null;
+        double nearestHookDist = Double.MAX_VALUE;
         double combatRange = Math.max(4.0, config.fishingSeaCreatureRange);
         double combatRangeSq = combatRange * combatRange;
 
@@ -74,6 +75,11 @@ public final class ClientFishingSensor {
             if (entity instanceof FishingHook hook) {
                 if (ownHook == null && hook.getPlayerOwner() == player) {
                     ownHook = hook;
+                }
+                double distSq = entity.distanceToSqr(player);
+                if (distSq < nearestHookDist) {
+                    nearestHookDist = distSq;
+                    nearestAnyHook = hook;
                 }
                 continue;
             }
@@ -95,21 +101,33 @@ public final class ClientFishingSensor {
             }
         }
 
+        // Hypixel sometimes leaves player.fishing unset; fall back to nearest nearby hook.
+        if (ownHook == null && nearestAnyHook != null && nearestHookDist <= 64.0 * 64.0) {
+            ownHook = nearestAnyHook;
+        }
+
         long nowTick = client.level.getGameTime();
         if (ownHook != null) {
             runtime.fishingBobberPresent = true;
-            boolean biting = isBiting(ownHook)
-                    || isMotionBite(ownHook, nowTick)
-                    || titleSuggestsBite(client);
-            if (biting) {
-                biteLatchUntilTick = nowTick + 12L;
+            if (isBiting(ownHook)) {
+                FishingBiteLatch.mark(nowTick, 16, "data_biting");
             }
-            runtime.fishingBiteReady = biting || nowTick <= biteLatchUntilTick;
+            if (isMotionBite(ownHook)) {
+                FishingBiteLatch.mark(nowTick, 16, "motion");
+            }
+            if (titleSuggestsBite(client)) {
+                FishingBiteLatch.mark(nowTick, 16, "title");
+            }
         } else {
             lastHookId = -1;
             lastHookY = Double.NaN;
             lastHookVelY = Double.NaN;
-            biteLatchUntilTick = -1L;
+        }
+
+        runtime.fishingBiteReady = FishingBiteLatch.isActive(nowTick);
+        // Holding a rod by name even when not FishingRodItem (custom SB items), or bobber out.
+        if (!runtime.fishingHoldingRod && runtime.fishingBobberPresent) {
+            runtime.fishingHoldingRod = true;
         }
 
         if (nearestCreature != null) {
@@ -135,7 +153,18 @@ public final class ClientFishingSensor {
         }
     }
 
-    private static boolean isMotionBite(FishingHook hook, long nowTick) {
+    public static boolean isRodStack(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return false;
+        }
+        if (stack.getItem() instanceof FishingRodItem) {
+            return true;
+        }
+        String name = stack.getHoverName() == null ? "" : stack.getHoverName().getString();
+        return FishingWeaponMatcher.isRod(name, "");
+    }
+
+    private static boolean isMotionBite(FishingHook hook) {
         int id = hook.getId();
         double y = hook.getY();
         double velY = hook.getDeltaMovement().y;
