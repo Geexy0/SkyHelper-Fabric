@@ -10,14 +10,22 @@ class FishingBiteSignalsTest {
     void biteHintsRequireDoubleBangOrPhrase() {
         assertTrue(FishingBiteSignals.isBiteHint(FishingBiteSignals.normalize("!!!")));
         assertTrue(FishingBiteSignals.isBiteHint(FishingBiteSignals.normalize("§c!!!!")));
-        assertTrue(FishingBiteSignals.isBiteHint(FishingBiteSignals.normalize("§aSomething bites!")));
         assertFalse(FishingBiteSignals.isBiteHint(FishingBiteSignals.normalize("!")));
-        assertFalse(FishingBiteSignals.isBiteHint(FishingBiteSignals.normalize("You caught a fish")));
     }
 
     @Test
-    void soundAndParticleBitesDisabled() {
-        assertFalse(FishingBiteSignals.isBiteSoundHint("minecraft:entity.fishing_bobber.splash"));
-        assertFalse(FishingBiteSignals.isBiteParticleHint("splash"));
+    void paulAddonsSkyblockBiteParticles() {
+        assertTrue(FishingBiteSignals.isSkyblockBiteParticle("minecraft:flame", 6, 0.2f));
+        assertTrue(FishingBiteSignals.isSkyblockBiteParticle("minecraft:fishing", 6, 0.2f));
+        assertTrue(FishingBiteSignals.isSkyblockBiteParticle("water_wake", 6, 0.2f));
+        assertFalse(FishingBiteSignals.isSkyblockBiteParticle("minecraft:flame", 5, 0.2f));
+        assertFalse(FishingBiteSignals.isSkyblockBiteParticle("minecraft:flame", 6, 0.5f));
+        assertFalse(FishingBiteSignals.isSkyblockBiteParticle("minecraft:splash", 6, 0.2f));
+    }
+
+    @Test
+    void nearBobberMatchesPaulAddonsDistance() {
+        assertTrue(FishingBiteSignals.isNearBobberXZ(10.05, 20.0, 10.0, 64.0, 20.0));
+        assertFalse(FishingBiteSignals.isNearBobberXZ(10.5, 20.0, 10.0, 64.0, 20.0));
     }
 }

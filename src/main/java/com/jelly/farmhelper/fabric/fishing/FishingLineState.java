@@ -4,8 +4,8 @@ package com.jelly.farmhelper.fabric.fishing;
  * Tracks whether a cast is outstanding and enforces rod-use cooldowns (stops lava spam).
  */
 public final class FishingLineState {
-    /** Ignore all bite signals until the bobber has settled (cast splash ≠ bite). */
-    public static final int BITE_GRACE_TICKS = 50;
+    /** Short settle after cast; PaulAddons particle filter is the real anti-false-bite. */
+    public static final int BITE_GRACE_TICKS = 20;
 
     private static volatile boolean lineOut;
     private static volatile long lastUseTick = -10_000L;

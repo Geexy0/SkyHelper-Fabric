@@ -8,6 +8,7 @@ import com.jelly.farmhelper.fabric.event.SpawnObjectEvent;
 import com.jelly.farmhelper.fabric.event.SpawnParticleEvent;
 import com.jelly.farmhelper.fabric.fishing.FishingBiteLatch;
 import com.jelly.farmhelper.fabric.fishing.FishingBiteSignals;
+import com.jelly.farmhelper.fabric.fishing.FishingLineState;
 import com.jelly.farmhelper.fabric.util.TablistUtils;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -21,6 +22,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
 import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
@@ -36,8 +39,10 @@ import net.minecraft.network.protocol.game.ClientboundSetTimePacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSoundPacket;
 import net.minecraft.network.protocol.game.ClientboundTabListPacket;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.PositionMoveRotation;
+import net.minecraft.world.entity.projectile.FishingHook;
 import net.minecraft.world.phys.Vec3;
 
 @Mixin(ClientPacketListener.class)
@@ -169,7 +174,84 @@ public class ClientPlayNetworkHandlerMixin {
                 new Vec3(packet.xDist(), packet.yDist(), packet.zDist()),
                 packet.count()
         ));
-        // Particles intentionally ignored — Crimson Isle lava spams splash/bubble.
+        // PaulAddons FunnyFishing bite: FLAME/WATER_WAKE particles, count=6, speed=0.2, near bobber.
+        tryMarkSkyblockBiteParticle(packet);
+    }
+
+    private static void tryMarkSkyblockBiteParticle(ClientboundLevelParticlesPacket packet) {
+        if (!FarmHelperFabric.getConfigManager().getConfig().enableAutoFishing) {
+            return;
+        }
+        Minecraft client = Minecraft.getInstance();
+        if (client == null || client.player == null || client.level == null) {
+            return;
+        }
+        long now = client.level.getGameTime();
+        if (!FishingLineState.canAcceptBite(now)) {
+            return;
+        }
+        FishingHook hook = client.player.fishing;
+        if (hook == null) {
+            return;
+        }
+        if (packet.count() != 6) {
+            return;
+        }
+        String typeId = particleTypeId(packet);
+        boolean typeOk = isKnownBiteParticleType(packet)
+                || FishingBiteSignals.isSkyblockBiteParticle(typeId, 6, 0.2f);
+        if (!typeOk) {
+            return;
+        }
+        float speed = biteParticleSpeed(packet);
+        boolean speedOk = Math.abs(speed - 0.2f) <= 0.001f || speed < 1.0e-4f;
+        if (!speedOk) {
+            return;
+        }
+        if (!FishingBiteSignals.isNearBobberXZ(packet.x(), packet.z(), hook.getX(), hook.getY(), hook.getZ())) {
+            return;
+        }
+        FishingBiteLatch.markPopup(now, "particle:" + typeId);
+    }
+
+    private static boolean isKnownBiteParticleType(ClientboundLevelParticlesPacket packet) {
+        if (packet.particle() == null) {
+            return false;
+        }
+        var type = packet.particle().getType();
+        return type == ParticleTypes.FLAME || type == ParticleTypes.FISHING;
+    }
+
+    private static String particleTypeId(ClientboundLevelParticlesPacket packet) {
+        try {
+            if (packet.particle() != null) {
+                Identifier id = BuiltInRegistries.PARTICLE_TYPE.getKey(packet.particle().getType());
+                if (id != null) {
+                    return id.toString();
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return packet.particle() == null ? "" : String.valueOf(packet.particle());
+    }
+
+    private static float biteParticleSpeed(ClientboundLevelParticlesPacket packet) {
+        // 1.8 particleSpeed → max-speed fields on modern packets; also probe dist floats.
+        float best = 0f;
+        float[] candidates = {
+                packet.xMaxSpeed(), packet.yMaxSpeed(), packet.zMaxSpeed(),
+                packet.xDist(), packet.yDist(), packet.zDist()
+        };
+        for (float c : candidates) {
+            float a = Math.abs(c);
+            if (Math.abs(a - 0.2f) <= 0.001f) {
+                return a;
+            }
+            if (a > best) {
+                best = a;
+            }
+        }
+        return best;
     }
 
     @Inject(method = "handleSoundEvent", at = @At("HEAD"), require = 0)
