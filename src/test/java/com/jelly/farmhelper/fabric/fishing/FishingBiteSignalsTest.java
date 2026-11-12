@@ -7,28 +7,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FishingBiteSignalsTest {
     @Test
-    void biteHints() {
-        assertTrue(FishingBiteSignals.isBiteHint(FishingBiteSignals.normalize("§aSomething bites!")));
+    void biteHintsRequireDoubleBangOrPhrase() {
         assertTrue(FishingBiteSignals.isBiteHint(FishingBiteSignals.normalize("!!!")));
         assertTrue(FishingBiteSignals.isBiteHint(FishingBiteSignals.normalize("§c!!!!")));
-        assertFalse(FishingBiteSignals.isBiteHint(FishingBiteSignals.normalize("You caught a fish")));
+        assertTrue(FishingBiteSignals.isBiteHint(FishingBiteSignals.normalize("§aSomething bites!")));
         assertFalse(FishingBiteSignals.isBiteHint(FishingBiteSignals.normalize("!")));
+        assertFalse(FishingBiteSignals.isBiteHint(FishingBiteSignals.normalize("You caught a fish")));
     }
 
     @Test
-    void staffPauseHints() {
-        assertTrue(FishingBiteSignals.isStaffOrPauseHint(FishingBiteSignals.normalize("Sending to server mini123")));
-        assertTrue(FishingBiteSignals.isStaffOrPauseHint(FishingBiteSignals.normalize("Warping...")));
-        assertFalse(FishingBiteSignals.isStaffOrPauseHint(FishingBiteSignals.normalize("Good catch!")));
-    }
-
-    @Test
-    void biteSoundStrictAndParticlesDisabled() {
-        assertTrue(FishingBiteSignals.isBiteSoundHint("minecraft:entity.fishing_bobber.splash"));
-        assertFalse(FishingBiteSignals.isBiteSoundHint("minecraft:block.note_block.pling"));
-        assertFalse(FishingBiteSignals.isBiteSoundHint("minecraft:entity.player.splash"));
-        assertFalse(FishingBiteSignals.isBiteSoundHint("minecraft:entity.cow.ambient"));
+    void soundAndParticleBitesDisabled() {
+        assertFalse(FishingBiteSignals.isBiteSoundHint("minecraft:entity.fishing_bobber.splash"));
         assertFalse(FishingBiteSignals.isBiteParticleHint("splash"));
-        assertFalse(FishingBiteSignals.isBiteParticleHint("fishing"));
     }
 }

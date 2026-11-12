@@ -98,23 +98,15 @@ public final class ClientFishingSensor {
         long nowTick = client.level.getGameTime();
         if (ownHook != null) {
             runtime.fishingBobberPresent = true;
-            if (FishingLineState.isLineOut()) {
-                if (isBiting(ownHook)) {
-                    FishingBiteLatch.mark(nowTick, 12, "data_biting");
-                }
-                if (isMotionBite(ownHook)) {
-                    FishingBiteLatch.mark(nowTick, 12, "motion");
-                }
-            }
         } else {
             lastHookId = -1;
             lastHookY = Double.NaN;
             lastHookVelY = Double.NaN;
         }
 
-        // Titles work for lava fishing even when the client never tracks a FishingHook.
-        if (FishingLineState.isLineOut() && titleSuggestsBite(client)) {
-            FishingBiteLatch.mark(nowTick, 12, "title");
+        // SkyBlock lava/water: pull ONLY on !!! popup (not bobber motion / DATA_BITING / cast splash).
+        if (FishingLineState.canAcceptBite(nowTick) && titleSuggestsBite(client)) {
+            FishingBiteLatch.markPopup(nowTick, "title");
         }
 
         runtime.fishingBiteReady = FishingBiteLatch.isActive(nowTick);

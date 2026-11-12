@@ -56,8 +56,9 @@ public class AutoFishingFeatureModule extends MacroExclusiveFeatureModule {
     @Override
     public void onChatMessage(String message) {
         String normalized = FishingBiteSignals.normalize(message);
-        if (FishingBiteSignals.isBiteHint(normalized) && FishingLineState.isLineOut()) {
+        if (FishingBiteSignals.isBiteHint(normalized) && FishingLineState.canAcceptBite(lastTick)) {
             chatBiteHint = true;
+            FishingBiteLatch.markPopup(lastTick, "chat");
         }
         if (FishingBiteSignals.isStaffOrPauseHint(normalized)) {
             FarmHelperConfig config = FarmHelperFabric.getConfigManager().getConfig();
@@ -118,7 +119,7 @@ public class AutoFishingFeatureModule extends MacroExclusiveFeatureModule {
     }
 
     private void tickState(FeatureRuntimeState runtime, FarmHelperConfig config) {
-        boolean biteNow = FishingLineState.isLineOut()
+        boolean biteNow = FishingLineState.canAcceptBite(runtime.tickCount)
                 && (runtime.fishingBiteReady || chatBiteHint || FishingBiteLatch.isActive(runtime.tickCount));
         if (biteNow && (state == State.WAIT_BITE || state == State.TROPHY_FOCUS || state == State.HUMAN_BREAK)) {
             nextActionTick = runtime.tickCount;

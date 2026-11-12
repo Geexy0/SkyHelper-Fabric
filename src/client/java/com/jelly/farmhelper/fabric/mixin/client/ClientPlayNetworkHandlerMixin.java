@@ -186,9 +186,7 @@ public class ClientPlayNetworkHandlerMixin {
         } catch (Throwable ignored) {
             soundId = String.valueOf(packet.getSound());
         }
-        if (FishingBiteSignals.isBiteSoundHint(soundId)) {
-            markFishingBite("sound:" + soundId);
-        }
+        // Sound bites disabled — cast landing splash == bite splash on Hypixel.
     }
 
     @Inject(method = "setTitleText", at = @At("HEAD"), require = 0)
@@ -212,17 +210,10 @@ public class ClientPlayNetworkHandlerMixin {
         }
         String normalized = FishingBiteSignals.normalize(text.getString());
         if (FishingBiteSignals.isBiteHint(normalized)) {
-            markFishingBite(reason);
+            Minecraft client = Minecraft.getInstance();
+            long now = client != null && client.level != null ? client.level.getGameTime() : 0L;
+            FishingBiteLatch.markPopup(now, reason);
         }
-    }
-
-    private static void markFishingBite(String reason) {
-        if (!com.jelly.farmhelper.fabric.fishing.FishingLineState.isLineOut()) {
-            return;
-        }
-        Minecraft client = Minecraft.getInstance();
-        long now = client != null && client.level != null ? client.level.getGameTime() : 0L;
-        FishingBiteLatch.mark(now, 12, reason);
     }
 
     @Inject(method = "handleAddEntity", at = @At("HEAD"), require = 0)

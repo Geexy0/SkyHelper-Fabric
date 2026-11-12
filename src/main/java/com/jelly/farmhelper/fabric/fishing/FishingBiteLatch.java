@@ -11,8 +11,7 @@ public final class FishingBiteLatch {
     }
 
     public static void mark(long nowTick, int holdTicks, String reason) {
-        // Never accept bites unless a cast is outstanding — stops lava particle/sound spam.
-        if (!FishingLineState.isLineOut()) {
+        if (!FishingLineState.canAcceptBite(nowTick)) {
             return;
         }
         long until = nowTick + Math.max(2, holdTicks);
@@ -22,6 +21,13 @@ public final class FishingBiteLatch {
         if (reason != null && !reason.isBlank()) {
             lastReason = reason;
         }
+    }
+
+    /**
+     * Hypixel SkyBlock: only accept explicit popup/chat bite text (e.g. !!!).
+     */
+    public static void markPopup(long nowTick, String reason) {
+        mark(nowTick, 16, reason == null ? "popup" : reason);
     }
 
     public static boolean isActive(long nowTick) {

@@ -23,14 +23,14 @@ public final class FishingBiteSignals {
         if (normalized == null || normalized.isBlank()) {
             return false;
         }
-        // Hypixel flashes "!!!" (often title/subtitle/actionbar) on bite — primary SB signal.
-        if (normalized.contains("!!!") || normalized.matches("!{2,}")) {
+        // Hypixel SkyBlock bite popup — require at least two '!'. Single '!' is too noisy.
+        String stripped = normalized.replace(" ", "");
+        if (stripped.contains("!!") || normalized.matches(".*!{2,}.*")) {
             return true;
         }
         return normalized.contains("fish bites")
                 || normalized.contains("something bites")
-                || normalized.contains("got a bite")
-                || normalized.contains("bite!");
+                || normalized.contains("got a bite");
     }
 
     /**
@@ -51,14 +51,10 @@ public final class FishingBiteSignals {
     }
 
     /**
-     * Only true fishing-bobber splash. Lava/player splash and note plings are too noisy on CI.
+     * Sound-based bites disabled for SkyBlock — cast-landing splash looks identical to a bite.
      */
     public static boolean isBiteSoundHint(String soundId) {
-        String id = normalize(soundId);
-        if (id.isBlank()) {
-            return false;
-        }
-        return id.contains("fishing_bobber") || id.contains("fishing.bobber");
+        return false;
     }
 
     /**

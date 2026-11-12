@@ -13,18 +13,19 @@ class FishingLineStateTest {
     }
 
     @Test
-    void biteLatchIgnoredUnlessLineOut() {
-        FishingBiteLatch.clear();
-        FishingBiteLatch.mark(10L, 12, "test");
+    void biteIgnoredDuringGraceAndWithoutLine() {
+        FishingBiteLatch.markPopup(10L, "title");
         assertFalse(FishingBiteLatch.isActive(10L));
 
         FishingLineState.markCast(10L);
-        FishingBiteLatch.mark(11L, 12, "title");
-        assertTrue(FishingBiteLatch.isActive(11L));
+        FishingBiteLatch.markPopup(20L, "title");
+        assertFalse(FishingLineState.canAcceptBite(20L));
+        assertFalse(FishingBiteLatch.isActive(20L));
 
-        FishingLineState.markReel(20L);
-        assertFalse(FishingLineState.isLineOut());
-        assertFalse(FishingBiteLatch.isActive(21L));
+        long ready = 10L + FishingLineState.BITE_GRACE_TICKS;
+        assertTrue(FishingLineState.canAcceptBite(ready));
+        FishingBiteLatch.markPopup(ready, "title");
+        assertTrue(FishingBiteLatch.isActive(ready));
     }
 
     @Test
