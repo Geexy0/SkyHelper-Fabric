@@ -169,11 +169,7 @@ public class ClientPlayNetworkHandlerMixin {
                 new Vec3(packet.xDist(), packet.yDist(), packet.zDist()),
                 packet.count()
         ));
-        if (FarmHelperFabric.getConfigManager().getConfig().enableAutoFishing
-                && packet.particle() != null
-                && FishingBiteSignals.isBiteParticleHint(String.valueOf(packet.particle()))) {
-            markFishingBite("particle");
-        }
+        // Particles intentionally ignored — Crimson Isle lava spams splash/bubble.
     }
 
     @Inject(method = "handleSoundEvent", at = @At("HEAD"), require = 0)
@@ -221,9 +217,12 @@ public class ClientPlayNetworkHandlerMixin {
     }
 
     private static void markFishingBite(String reason) {
+        if (!com.jelly.farmhelper.fabric.fishing.FishingLineState.isLineOut()) {
+            return;
+        }
         Minecraft client = Minecraft.getInstance();
         long now = client != null && client.level != null ? client.level.getGameTime() : 0L;
-        FishingBiteLatch.mark(now, 20, reason);
+        FishingBiteLatch.mark(now, 12, reason);
     }
 
     @Inject(method = "handleAddEntity", at = @At("HEAD"), require = 0)

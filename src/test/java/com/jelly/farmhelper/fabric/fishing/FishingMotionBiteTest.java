@@ -7,10 +7,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FishingMotionBiteTest {
     @Test
-    void detectsSuddenBobberDip() {
-        assertTrue(FishingBiteSignals.isMotionBiteSignal(64.0, 63.9, 0.0, -0.2));
-        assertTrue(FishingBiteSignals.isMotionBiteSignal(10.0, 9.95, -0.01, -0.2));
-        assertTrue(FishingBiteSignals.isMotionBiteSignal(64.0, 63.97, 0.0, -0.07));
+    void detectsStrongBobberDipOnly() {
+        assertTrue(FishingBiteSignals.isMotionBiteSignal(64.0, 63.9, 0.0, -0.25));
+        assertFalse(FishingBiteSignals.isMotionBiteSignal(64.0, 63.97, 0.0, -0.07));
     }
 
     @Test

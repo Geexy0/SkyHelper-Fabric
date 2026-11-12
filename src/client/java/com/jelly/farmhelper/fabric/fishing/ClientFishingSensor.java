@@ -63,8 +63,6 @@ public final class ClientFishingSensor {
         double nearestCreatureDist = Double.MAX_VALUE;
         Entity golden = null;
         double goldenDist = Double.MAX_VALUE;
-        FishingHook nearestAnyHook = null;
-        double nearestHookDist = Double.MAX_VALUE;
         double combatRange = Math.max(4.0, config.fishingSeaCreatureRange);
         double combatRangeSq = combatRange * combatRange;
 
@@ -73,13 +71,9 @@ public final class ClientFishingSensor {
                 continue;
             }
             if (entity instanceof FishingHook hook) {
+                // Only our hook — never latch onto a random nearby bobber (causes lava spam).
                 if (ownHook == null && hook.getPlayerOwner() == player) {
                     ownHook = hook;
-                }
-                double distSq = entity.distanceToSqr(player);
-                if (distSq < nearestHookDist) {
-                    nearestHookDist = distSq;
-                    nearestAnyHook = hook;
                 }
                 continue;
             }
@@ -101,22 +95,16 @@ public final class ClientFishingSensor {
             }
         }
 
-        // Hypixel sometimes leaves player.fishing unset; fall back to nearest nearby hook.
-        if (ownHook == null && nearestAnyHook != null && nearestHookDist <= 64.0 * 64.0) {
-            ownHook = nearestAnyHook;
-        }
-
         long nowTick = client.level.getGameTime();
         if (ownHook != null) {
             runtime.fishingBobberPresent = true;
-            if (isBiting(ownHook)) {
-                FishingBiteLatch.mark(nowTick, 16, "data_biting");
-            }
-            if (isMotionBite(ownHook)) {
-                FishingBiteLatch.mark(nowTick, 16, "motion");
-            }
-            if (titleSuggestsBite(client)) {
-                FishingBiteLatch.mark(nowTick, 16, "title");
+            if (FishingLineState.isLineOut()) {
+                if (isBiting(ownHook)) {
+                    FishingBiteLatch.mark(nowTick, 12, "data_biting");
+                }
+                if (isMotionBite(ownHook)) {
+                    FishingBiteLatch.mark(nowTick, 12, "motion");
+                }
             }
         } else {
             lastHookId = -1;
@@ -124,8 +112,12 @@ public final class ClientFishingSensor {
             lastHookVelY = Double.NaN;
         }
 
+        // Titles work for lava fishing even when the client never tracks a FishingHook.
+        if (FishingLineState.isLineOut() && titleSuggestsBite(client)) {
+            FishingBiteLatch.mark(nowTick, 12, "title");
+        }
+
         runtime.fishingBiteReady = FishingBiteLatch.isActive(nowTick);
-        // Holding a rod by name even when not FishingRodItem (custom SB items), or bobber out.
         if (!runtime.fishingHoldingRod && runtime.fishingBobberPresent) {
             runtime.fishingHoldingRod = true;
         }

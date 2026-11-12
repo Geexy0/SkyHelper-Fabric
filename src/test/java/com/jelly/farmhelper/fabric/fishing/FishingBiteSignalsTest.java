@@ -12,6 +12,7 @@ class FishingBiteSignalsTest {
         assertTrue(FishingBiteSignals.isBiteHint(FishingBiteSignals.normalize("!!!")));
         assertTrue(FishingBiteSignals.isBiteHint(FishingBiteSignals.normalize("§c!!!!")));
         assertFalse(FishingBiteSignals.isBiteHint(FishingBiteSignals.normalize("You caught a fish")));
+        assertFalse(FishingBiteSignals.isBiteHint(FishingBiteSignals.normalize("!")));
     }
 
     @Test
@@ -22,11 +23,12 @@ class FishingBiteSignalsTest {
     }
 
     @Test
-    void biteSoundAndParticleHints() {
+    void biteSoundStrictAndParticlesDisabled() {
         assertTrue(FishingBiteSignals.isBiteSoundHint("minecraft:entity.fishing_bobber.splash"));
-        assertTrue(FishingBiteSignals.isBiteSoundHint("minecraft:block.note_block.pling"));
+        assertFalse(FishingBiteSignals.isBiteSoundHint("minecraft:block.note_block.pling"));
+        assertFalse(FishingBiteSignals.isBiteSoundHint("minecraft:entity.player.splash"));
         assertFalse(FishingBiteSignals.isBiteSoundHint("minecraft:entity.cow.ambient"));
-        assertTrue(FishingBiteSignals.isBiteParticleHint("fishing"));
-        assertTrue(FishingBiteSignals.isBiteParticleHint("splash"));
+        assertFalse(FishingBiteSignals.isBiteParticleHint("splash"));
+        assertFalse(FishingBiteSignals.isBiteParticleHint("fishing"));
     }
 }

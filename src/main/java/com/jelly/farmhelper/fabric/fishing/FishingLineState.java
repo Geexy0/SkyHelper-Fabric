@@ -1,0 +1,46 @@
+package com.jelly.farmhelper.fabric.fishing;
+
+/**
+ * Tracks whether a cast is outstanding and enforces rod-use cooldowns (stops lava spam).
+ */
+public final class FishingLineState {
+    private static volatile boolean lineOut;
+    private static volatile long lastUseTick = -10_000L;
+    private static volatile long castAtTick = -1L;
+
+    private FishingLineState() {
+    }
+
+    public static void reset() {
+        lineOut = false;
+        lastUseTick = -10_000L;
+        castAtTick = -1L;
+        FishingBiteLatch.clear();
+    }
+
+    public static boolean isLineOut() {
+        return lineOut;
+    }
+
+    public static long castAtTick() {
+        return castAtTick;
+    }
+
+    public static void markCast(long nowTick) {
+        lineOut = true;
+        castAtTick = nowTick;
+        lastUseTick = nowTick;
+        FishingBiteLatch.clear();
+    }
+
+    public static void markReel(long nowTick) {
+        lineOut = false;
+        castAtTick = -1L;
+        lastUseTick = nowTick;
+        FishingBiteLatch.clear();
+    }
+
+    public static boolean canUseRod(long nowTick, int minGapTicks) {
+        return nowTick - lastUseTick >= Math.max(1, minGapTicks);
+    }
+}

@@ -23,59 +23,49 @@ public final class FishingBiteSignals {
         if (normalized == null || normalized.isBlank()) {
             return false;
         }
-        // Hypixel often flashes "!!!" (or denser) as a title/subtitle on bite.
+        // Hypixel flashes "!!!" (often title/subtitle/actionbar) on bite — primary SB signal.
         if (normalized.contains("!!!") || normalized.matches("!{2,}")) {
             return true;
         }
         return normalized.contains("fish bites")
                 || normalized.contains("something bites")
                 || normalized.contains("got a bite")
-                || normalized.contains("bite!")
-                || normalized.equals("!");
+                || normalized.contains("bite!");
     }
 
     /**
-     * Bobber suddenly yanked down — works when vanilla DATA_BITING is never synced (Hypixel).
+     * Bobber suddenly yanked down. Keep thresholds modest to avoid lava jitter false positives.
      */
     public static boolean isMotionBiteSignal(double prevY, double currY, double prevVelY, double currVelY) {
         if (Double.isNaN(prevY) || Double.isNaN(currY)) {
             return false;
         }
         double dy = currY - prevY;
-        // Soft thresholds: Hypixel bobbers often twitch less than vanilla.
-        if (dy <= -0.02) {
+        if (dy <= -0.08) {
             return true;
         }
         return !Double.isNaN(prevVelY)
                 && !Double.isNaN(currVelY)
-                && prevVelY > -0.04
-                && currVelY <= -0.06;
+                && prevVelY > -0.02
+                && currVelY <= -0.2;
     }
 
+    /**
+     * Only true fishing-bobber splash. Lava/player splash and note plings are too noisy on CI.
+     */
     public static boolean isBiteSoundHint(String soundId) {
         String id = normalize(soundId);
         if (id.isBlank()) {
             return false;
         }
-        return id.contains("fishing_bobber")
-                || id.contains("fishing.bobber")
-                || id.contains("entity.fishing_bobber.splash")
-                || id.contains("entity.player.splash")
-                || id.contains("note_block.pling")
-                || id.contains("note.pling")
-                || id.contains("block.note_block.pling")
-                || (id.contains("pling") && (id.contains("note") || id.contains("pling")));
+        return id.contains("fishing_bobber") || id.contains("fishing.bobber");
     }
 
+    /**
+     * Particles are not used for bite detection — lava spams splash/bubble constantly.
+     */
     public static boolean isBiteParticleHint(String particleId) {
-        String id = normalize(particleId);
-        if (id.isBlank()) {
-            return false;
-        }
-        return id.contains("fishing")
-                || id.contains("splash")
-                || (id.contains("bubble") && id.contains("column"))
-                || id.contains("wake");
+        return false;
     }
 
     public static boolean isStaffOrPauseHint(String normalized) {

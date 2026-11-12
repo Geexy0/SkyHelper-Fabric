@@ -11,6 +11,10 @@ public final class FishingBiteLatch {
     }
 
     public static void mark(long nowTick, int holdTicks, String reason) {
+        // Never accept bites unless a cast is outstanding — stops lava particle/sound spam.
+        if (!FishingLineState.isLineOut()) {
+            return;
+        }
         long until = nowTick + Math.max(2, holdTicks);
         if (until > untilTick) {
             untilTick = until;

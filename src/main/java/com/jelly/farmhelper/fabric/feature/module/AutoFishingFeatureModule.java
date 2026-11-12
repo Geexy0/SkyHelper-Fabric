@@ -7,12 +7,16 @@ import com.jelly.farmhelper.fabric.fishing.FishingAntiDetect;
 import com.jelly.farmhelper.fabric.fishing.FishingBiteLatch;
 import com.jelly.farmhelper.fabric.fishing.FishingBiteSignals;
 import com.jelly.farmhelper.fabric.fishing.FishingEntityHeuristics;
+import com.jelly.farmhelper.fabric.fishing.FishingLineState;
 import com.jelly.farmhelper.fabric.fishing.FishingWeaponMatcher;
 
 /**
  * Auto fishing state machine: cast/wait/reel, optional sea-creature kill, trophy focus, anti-detect breaks.
+ * Lava (Crimson Isle) safe: no particle bites, line-out gate, rod-use cooldown, no bobberless recast spam.
  */
 public class AutoFishingFeatureModule extends MacroExclusiveFeatureModule {
+    private static final int ROD_USE_COOLDOWN_TICKS = 18;
+
     private enum State {
         IDLE,
         CAST,
@@ -28,7 +32,6 @@ public class AutoFishingFeatureModule extends MacroExclusiveFeatureModule {
     private long stateSinceTick;
     private long nextActionTick;
     private long biteDeadlineTick;
-    private long sessionArmedTick = -1L;
     private long lastTick;
     private boolean castPending;
     private boolean chatBiteHint;
@@ -53,7 +56,7 @@ public class AutoFishingFeatureModule extends MacroExclusiveFeatureModule {
     @Override
     public void onChatMessage(String message) {
         String normalized = FishingBiteSignals.normalize(message);
-        if (FishingBiteSignals.isBiteHint(normalized)) {
+        if (FishingBiteSignals.isBiteHint(normalized) && FishingLineState.isLineOut()) {
             chatBiteHint = true;
         }
         if (FishingBiteSignals.isStaffOrPauseHint(normalized)) {
@@ -85,7 +88,6 @@ public class AutoFishingFeatureModule extends MacroExclusiveFeatureModule {
             }
             return;
         }
-        // Mutual exclusion with crop macro: only run when farming macro is off, or pause it.
         if (runtime.macroToggled && state == State.IDLE) {
             return;
         }
@@ -95,7 +97,6 @@ public class AutoFishingFeatureModule extends MacroExclusiveFeatureModule {
                 return;
             }
             antiDetect.onSessionStart(runtime.tickCount);
-            sessionArmedTick = runtime.tickCount;
             if (config.fishingBreaksEnabled) {
                 antiDetect.scheduleNextBreak(
                         runtime.tickCount,
@@ -117,21 +118,24 @@ public class AutoFishingFeatureModule extends MacroExclusiveFeatureModule {
     }
 
     private void tickState(FeatureRuntimeState runtime, FarmHelperConfig config) {
-        // Bite windows on Hypixel are short — never let settle delays swallow a bite.
-        boolean biteNow = runtime.fishingBiteReady || chatBiteHint || FishingBiteLatch.isActive(runtime.tickCount);
+        boolean biteNow = FishingLineState.isLineOut()
+                && (runtime.fishingBiteReady || chatBiteHint || FishingBiteLatch.isActive(runtime.tickCount));
         if (biteNow && (state == State.WAIT_BITE || state == State.TROPHY_FOCUS || state == State.HUMAN_BREAK)) {
-            // Pull ASAP. Anti-detect reaction delay was swallowing Hypixel bite windows.
             nextActionTick = runtime.tickCount;
             setState(State.REEL, runtime.tickCount);
         }
 
-        if (runtime.tickCount < nextActionTick && state != State.REEL) {
+        if (runtime.tickCount < nextActionTick) {
             return;
         }
 
         switch (state) {
             case CAST -> {
                 if (isEntryTick(runtime.tickCount)) {
+                    if (!FishingLineState.canUseRod(runtime.tickCount, ROD_USE_COOLDOWN_TICKS)) {
+                        nextActionTick = runtime.tickCount + 2L;
+                        return;
+                    }
                     queueSelectHotbarItem("rod", runtime.tickCount);
                     float pitch = config.fishingCastPitch;
                     float yaw = runtime.yaw + (config.fishingHumanizeMouse || config.fishingAntiDetect
@@ -143,27 +147,39 @@ public class AutoFishingFeatureModule extends MacroExclusiveFeatureModule {
                             : 160L;
                     queueRotateTo(yaw, lookPitch, Math.max(2L, rotMs / 50L), runtime.tickCount);
                     long settle = config.fishingAntiDetect
-                            ? antiDetect.sampleDelayTicks(80L, 220L, strength(config))
-                            : 3L;
+                            ? antiDetect.sampleDelayTicks(100L, 240L, strength(config))
+                            : 4L;
                     nextActionTick = runtime.tickCount + settle;
                     castPending = true;
                     return;
                 }
                 if (castPending) {
-                    queueUseHeldItem(runtime.tickCount);
+                    if (!FishingLineState.canUseRod(runtime.tickCount, ROD_USE_COOLDOWN_TICKS)) {
+                        nextActionTick = runtime.tickCount + 2L;
+                        return;
+                    }
+                    // Direct use — one cast only; mark line out before click.
+                    FishingLineState.markCast(runtime.tickCount);
+                    FarmHelperFabric.requestFishingReel();
                     castPending = false;
+                    chatBiteHint = false;
                     long after = config.fishingAntiDetect
-                            ? antiDetect.sampleDelayTicks(120L, 320L, strength(config))
-                            : 4L;
+                            ? antiDetect.sampleDelayTicks(200L, 400L, strength(config))
+                            : 8L;
                     nextActionTick = runtime.tickCount + after;
+                    biteDeadlineTick = runtime.tickCount
+                            + Math.max(40L, config.fishingBiteTimeoutSeconds) * 20L;
+                    setState(State.WAIT_BITE, runtime.tickCount);
                     return;
                 }
-                biteDeadlineTick = runtime.tickCount
-                        + Math.max(40L, config.fishingBiteTimeoutSeconds) * 20L;
-                chatBiteHint = false;
                 setState(State.WAIT_BITE, runtime.tickCount);
             }
             case WAIT_BITE -> {
+                if (!FishingLineState.isLineOut()) {
+                    // Cast never landed / already reeled — recast after cooldown.
+                    setState(State.CAST, runtime.tickCount);
+                    return;
+                }
                 if (config.fishingAntiDetect && config.fishingBreaksEnabled
                         && antiDetect.shouldStartBreak(runtime.tickCount, true)) {
                     antiDetect.beginBreak(
@@ -174,8 +190,10 @@ public class AutoFishingFeatureModule extends MacroExclusiveFeatureModule {
                     setState(State.HUMAN_BREAK, runtime.tickCount);
                     return;
                 }
-                // Bite already handled above; combat/trophy only when not biting.
-                if (config.fishingKillSeaCreatures && runtime.fishingSeaCreatureNearby) {
+                // Sea combat only after the line has been out a bit (avoid cast-frame false positives).
+                if (config.fishingKillSeaCreatures
+                        && runtime.fishingSeaCreatureNearby
+                        && ticksInState(runtime.tickCount) > 40L) {
                     setState(State.SEA_COMBAT, runtime.tickCount);
                     return;
                 }
@@ -186,29 +204,31 @@ public class AutoFishingFeatureModule extends MacroExclusiveFeatureModule {
                 maybeIdleLook(runtime, config);
                 maybeMicroMove(runtime, config);
 
-                if (!runtime.fishingBobberPresent && ticksInState(runtime.tickCount) > 30L) {
-                    setState(State.CAST, runtime.tickCount);
-                    return;
-                }
+                // Lava fishing often has no client FishingHook — do NOT recast just because bobber is missing.
+                // Only recast on full bite timeout.
                 if (runtime.tickCount >= biteDeadlineTick) {
-                    if (runtime.fishingBobberPresent) {
-                        queueUseHeldItem(runtime.tickCount); // reel empty
-                        long delay = config.fishingAntiDetect
-                                ? antiDetect.sampleDelayTicks(200L, 500L, strength(config))
-                                : 5L;
-                        nextActionTick = runtime.tickCount + delay;
+                    if (FishingLineState.canUseRod(runtime.tickCount, ROD_USE_COOLDOWN_TICKS)) {
+                        FishingLineState.markReel(runtime.tickCount);
+                        FarmHelperFabric.requestFishingReel(); // reel empty / reset line
                     }
+                    long delay = config.fishingAntiDetect
+                            ? antiDetect.sampleDelayTicks(300L, 700L, strength(config))
+                            : 10L;
+                    nextActionTick = runtime.tickCount + delay;
                     setState(State.CAST, runtime.tickCount);
                 }
             }
             case REEL -> {
-                // Prefer direct client use — the throttled action queue was missing bite windows.
+                if (!FishingLineState.canUseRod(runtime.tickCount, ROD_USE_COOLDOWN_TICKS)) {
+                    nextActionTick = runtime.tickCount + 2L;
+                    return;
+                }
+                FishingLineState.markReel(runtime.tickCount);
                 FarmHelperFabric.requestFishingReel();
                 chatBiteHint = false;
-                FishingBiteLatch.clear();
                 long delay = config.fishingAntiDetect
-                        ? antiDetect.sampleDelayTicks(180L, 480L, strength(config))
-                        : 5L;
+                        ? antiDetect.sampleDelayTicks(250L, 550L, strength(config))
+                        : 10L;
                 nextActionTick = runtime.tickCount + delay;
                 setState(State.CAST, runtime.tickCount);
             }
@@ -234,7 +254,6 @@ public class AutoFishingFeatureModule extends MacroExclusiveFeatureModule {
                             || prefs.toLowerCase().contains("hyperion")
                             || prefs.toLowerCase().contains("fire veil")
                             || prefs.toLowerCase().contains("frozen scythe")) {
-                        // Ability weapons: settle then right-click; never same-tick as select/attack.
                         queueUseHeldItem(attackAt + Math.max(2L, settleSwap));
                     }
                     long settle = Math.max(6L, config.fishingCombatResumeDelayMs / 50L);
@@ -250,7 +269,8 @@ public class AutoFishingFeatureModule extends MacroExclusiveFeatureModule {
                             : 6L;
                     queueSelectHotbarItem("rod", runtime.tickCount);
                     nextActionTick = runtime.tickCount + delay;
-                    setState(State.WAIT_BITE, runtime.tickCount);
+                    // Line may still be out from before combat; keep waiting if so.
+                    setState(FishingLineState.isLineOut() ? State.WAIT_BITE : State.CAST, runtime.tickCount);
                 }
             }
             case TROPHY_FOCUS -> {
@@ -260,11 +280,6 @@ public class AutoFishingFeatureModule extends MacroExclusiveFeatureModule {
                             runtime.fishingGoldenFishX, runtime.fishingGoldenFishY, runtime.fishingGoldenFishZ);
                     long rotTicks = Math.max(3L, antiDetect.rotationDurationMs(strength(config)) / 50L);
                     queueRotateTo(yaw, pitch, rotTicks, runtime.tickCount);
-                    if (!runtime.fishingBobberPresent) {
-                        setState(State.CAST, runtime.tickCount);
-                    } else if (runtime.fishingBiteReady || chatBiteHint) {
-                        setState(State.REEL, runtime.tickCount);
-                    }
                     nextActionTick = runtime.tickCount + rotTicks + 2L;
                     return;
                 }
@@ -312,7 +327,6 @@ public class AutoFishingFeatureModule extends MacroExclusiveFeatureModule {
         if (ticksInState(runtime.tickCount) % 130L != 0L) {
             return;
         }
-        // Tiny nudge via rotate only is safer than walking near lava; skip actual WASD in feature module.
         float yaw = runtime.yaw + antiDetect.idleYawDelta(0.8f);
         queueRotateTo(yaw, runtime.pitch, 2L, runtime.tickCount);
     }
@@ -341,10 +355,10 @@ public class AutoFishingFeatureModule extends MacroExclusiveFeatureModule {
         stateSinceTick = 0L;
         nextActionTick = 0L;
         biteDeadlineTick = 0L;
-        sessionArmedTick = -1L;
         castPending = false;
         chatBiteHint = false;
         antiDetect.reset();
+        FishingLineState.reset();
     }
 
     private static FishingAntiDetect.Strength strength(FarmHelperConfig config) {
